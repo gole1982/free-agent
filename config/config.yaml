@@ -1,0 +1,4 @@
+llm:
+  base_url: "https://818233.xyz"
+storage:
+  path: "./data/free-agent.db"
