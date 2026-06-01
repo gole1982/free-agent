@@ -1,0 +1,12 @@
+bin/
+data/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+.vscode/
+.idea/
