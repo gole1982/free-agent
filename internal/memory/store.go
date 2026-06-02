@@ -24,7 +24,7 @@ type Store struct {
 }
 
 func NewStore(path string) (*Store, error) {
-	db, err := sql.Open("sqlite3", path)
+	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, err
 	}
@@ -90,6 +90,67 @@ func (s *Store) GetMessages(convID int64) ([]Message, error) {
 		messages = append(messages, m)
 	}
 	return messages, nil
+}
+
+func (s *Store) GetConversations() ([]Conversation, error) {
+	rows, err := s.db.Query("SELECT id, title, created_at FROM conversations ORDER BY created_at DESC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var conversations []Conversation
+	for rows.Next() {
+		var c Conversation
+		var ts string
+		if err := rows.Scan(&c.ID, &c.Title, &ts); err != nil {
+			return nil, err
+		}
+		c.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", ts)
+		conversations = append(conversations, c)
+	}
+	return conversations, nil
+}
+
+func (s *Store) GetConversation(id int64) (*Conversation, error) {
+	var c Conversation
+	var ts string
+	err := s.db.QueryRow("SELECT id, title, created_at FROM conversations WHERE id = ?", id).Scan(&c.ID, &c.Title, &ts)
+	if err != nil {
+		return nil, err
+	}
+	c.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", ts)
+	return &c, nil
+}
+
+func (s *Store) DeleteConversation(id int64) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec("DELETE FROM messages WHERE conversation_id = ?", id); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if _, err := tx.Exec("DELETE FROM conversations WHERE id = ?", id); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (s *Store) UpdateConversationTitle(id int64, title string) error {
+	_, err := s.db.Exec("UPDATE conversations SET title = ? WHERE id = ?", title, id)
+	return err
+}
+
+func (s *Store) GetConversationCount() (int, error) {
+	var count int
+	err := s.db.QueryRow("SELECT COUNT(*) FROM conversations").Scan(&count)
+	return count, err
 }
 
 func (s *Store) Close() error {

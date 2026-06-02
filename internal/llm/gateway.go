@@ -8,9 +8,9 @@ type SimpleGateway struct {
 	client *Client
 }
 
-func NewSimpleGateway(baseURL string) *SimpleGateway {
+func NewSimpleGateway(baseURL string, apiKey string, byok bool) *SimpleGateway {
 	return &SimpleGateway{
-		client: NewClient(baseURL),
+		client: NewClient(baseURL, apiKey, byok),
 	}
 }
 

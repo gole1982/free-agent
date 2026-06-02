@@ -2,7 +2,7 @@ package memory
 
 import (
 	"database/sql"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 func initDB(db *sql.DB) error {

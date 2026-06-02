@@ -1,0 +1,97 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        go-version: ['1.22', '1.23']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+      
+      - name: Install dependencies
+        run: go mod tidy
+      
+      - name: Build
+        run: go build -o bin/free-agent ./cmd/free-agent
+      
+      - name: Run tests
+        run: go test -v ./...
+      
+      - name: Upload artifact (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: free-agent-linux
+          path: bin/free-agent
+      
+      - name: Upload artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: free-agent-windows
+          path: bin/free-agent.exe
+      
+      - name: Upload artifact (macOS)
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: free-agent-macos
+          path: bin/free-agent
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: free-agent-linux
+          path: ./bin
+      
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: free-agent-windows
+          path: ./bin
+      
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: free-agent-macos
+          path: ./bin
+      
+      - name: Create release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "bin/*"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: v${{ github.run_number }}
+          name: Release v${{ github.run_number }}
+          body: |
+            ## What's Changed
+            
+            - Automated release from CI/CD pipeline
+            - Built for Linux, Windows, and macOS
