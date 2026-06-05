@@ -10,3 +10,5 @@ data/
 go.work
 .vscode/
 .idea/
+projects/
+*.log

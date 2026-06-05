@@ -45,7 +45,25 @@ go build -o bin/free-agent.exe ./cmd/free-agent
 | `free-agent -chat` | Start chat-only mode (session: chat, project: chat-only) |
 | `free-agent -session` | List all saved sessions with name and description |
 | `free-agent -session <name>` | Restore a specific session by name |
+| `free-agent -check` | Check system status and API connection |
 | `free-agent -help` | Show help message with usage examples |
+
+### System Check (`-check`)
+
+The `-check` command performs three verification tasks:
+
+1. **License Check**: Dynamically reads and displays the license from LICENSE file
+2. **LLM Check**: Displays the configured LLM name
+3. **API Connectivity Test**: Sends "What is today's date?" request and extracts date from response
+
+**Output Format**:
+```
+=== System Check ===
+1. License: MIT License
+2. LLM: Free LLM
+3. Remote Service: Normal/Abnormal
+4. [extracted date string] / API Response: [response]
+```
 
 ### Session Naming
 

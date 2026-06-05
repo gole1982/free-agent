@@ -13,6 +13,11 @@ type ProgramConfig struct {
 		BYOK bool
 		URL  string
 		Key  string
+		Name string
+	}
+	User struct {
+		Name          string
+		GreetingFormat string
 	}
 	Directory struct {
 		Startup string
@@ -20,6 +25,9 @@ type ProgramConfig struct {
 	ProgramLog struct {
 		Name  string
 		Level string
+	}
+	Pentesting struct {
+		Enabled bool
 	}
 }
 
@@ -50,10 +58,19 @@ func LoadProgramConfig() (*ProgramConfig, error) {
 			BYOK bool
 			URL  string
 			Key  string
+			Name string
 		}{
 			BYOK: false,
 			URL:  "https://818233.xyz",
 			Key:  "",
+			Name: "Free LLM",
+		},
+		User: struct {
+			Name          string
+			GreetingFormat string
+		}{
+			Name:          "User",
+			GreetingFormat: "Hi $name! Today is $day, $date. Nice to meet you!",
 		},
 		Directory: struct {
 			Startup string
@@ -66,6 +83,11 @@ func LoadProgramConfig() (*ProgramConfig, error) {
 		}{
 			Name:  "free-agent.log",
 			Level: "info",
+		},
+		Pentesting: struct {
+			Enabled bool
+		}{
+			Enabled: false,
 		},
 	}
 
@@ -85,6 +107,15 @@ func LoadProgramConfig() (*ProgramConfig, error) {
 		if val, ok := envMap["API_KEY"]; ok {
 			cfg.API.Key = val
 		}
+		if val, ok := envMap["API_NAME"]; ok {
+			cfg.API.Name = val
+		}
+		if val, ok := envMap["USER_NAME"]; ok {
+			cfg.User.Name = val
+		}
+		if val, ok := envMap["GREETING_FORMAT"]; ok {
+			cfg.User.GreetingFormat = val
+		}
 		if val, ok := envMap["DIRECTORY_STARTUP"]; ok {
 			cfg.Directory.Startup = val
 		}
@@ -93,6 +124,9 @@ func LoadProgramConfig() (*ProgramConfig, error) {
 		}
 		if val, ok := envMap["PROGRAM_LOG_LEVEL"]; ok {
 			cfg.ProgramLog.Level = val
+		}
+		if val, ok := envMap["PENTESTING_ENABLED"]; ok {
+			cfg.Pentesting.Enabled = strings.ToLower(val) == "true"
 		}
 	}
 
@@ -103,6 +137,20 @@ func LoadProgramConfig() (*ProgramConfig, error) {
 // GetProgramStoragePath 获取程序默认存储路径
 func GetProgramStoragePath() string {
 	return "./data/free-agent.db"
+}
+
+// GetLicense 获取许可证信息
+func GetLicense() (string, error) {
+	data, err := os.ReadFile("LICENSE")
+	if err != nil {
+		return "", err
+	}
+	
+	lines := strings.Split(string(data), "\n")
+	if len(lines) > 0 {
+		return lines[0], nil
+	}
+	return "MIT License", nil
 }
 
 func LoadProjectConfig(projectDir string) (*ProjectConfig, error) {

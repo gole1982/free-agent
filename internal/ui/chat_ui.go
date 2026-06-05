@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/vibe-coding/free-agent/internal/messaging"
 )
 
 var (
@@ -74,15 +75,20 @@ type ChatModel struct {
 	charCountTotal    int
 	contextInfo       string
 	currentAgent      string
+	llmName           string
 	thinkingTime      float64
 	inputChan         chan string
 	responseChan      chan string
 	errorChan         chan error
 	focusList         bool
 	listWidth         int
+	pentestMode       bool
+	projectName       string
+	saveChan          chan string
+	quitConfirm       bool
 }
 
-func NewChatModel(width, height int, inputChan, responseChan chan string, errorChan chan error) *ChatModel {
+func NewChatModel(width, height int, inputChan, responseChan chan string, errorChan chan error, saveChan chan string, pentestMode bool) *ChatModel {
 	listWidth := 35
 	contentWidth := width - listWidth - 4
 
@@ -116,6 +122,8 @@ func NewChatModel(width, height int, inputChan, responseChan chan string, errorC
 		charCountTotal:   0,
 		listWidth:        listWidth,
 		focusList:        false,
+		pentestMode:      pentestMode,
+		saveChan:         saveChan,
 	}
 }
 
@@ -152,11 +160,56 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "enter":
-			if !m.focusList && m.textarea.Value() != "" && !m.isThinking {
+			if !m.focusList && m.textarea.Value() != "" {
 				input := m.textarea.Value()
-				m.startNewRound(input)
-				m.textarea.Reset()
-				m.inputChan <- input
+				trimmedInput := strings.TrimSpace(input)
+				
+				if m.quitConfirm {
+					if trimmedInput == "" {
+						m.quitConfirm = false
+						m.systemStatus = "Quit cancelled"
+					} else {
+						m.projectName = trimmedInput
+						m.saveChan <- trimmedInput
+						return m, tea.Quit
+					}
+					m.textarea.Reset()
+					return m, nil
+				}
+				
+				if trimmedInput == "/quit" {
+					if m.projectName != "" {
+						m.saveChan <- m.projectName
+						return m, tea.Quit
+					}
+					m.quitConfirm = true
+					m.systemStatus = "Save project name before quit? (Enter name or press Enter to cancel, /forcequit to exit without saving)"
+					m.textarea.Reset()
+					return m, nil
+				}
+				
+				if strings.HasPrefix(trimmedInput, "/save ") {
+					projectName := strings.TrimSpace(strings.TrimPrefix(trimmedInput, "/save "))
+					if projectName != "" {
+						m.projectName = projectName
+						m.saveChan <- projectName
+						m.systemStatus = fmt.Sprintf("Project saved as: %s", projectName)
+					} else {
+						m.systemStatus = "Please provide a project name: /save <name>"
+					}
+					m.textarea.Reset()
+					return m, nil
+				}
+				
+				if trimmedInput == "/forcequit" {
+					return m, tea.Quit
+				}
+				
+				if !m.isThinking {
+					m.startNewRound(input)
+					m.textarea.Reset()
+					m.inputChan <- input
+				}
 			} else if m.focusList {
 				if selected := m.conversationList.SelectedItem(); selected != nil {
 					roundItem := selected.(ConversationRoundItem)
@@ -175,6 +228,9 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ResponseMsg:
 		m.handleResponse(msg.Content)
 	case ErrorMsg:
+		if strings.Contains(msg.Err.Error(), "quit requested") {
+			return m, tea.Quit
+		}
 		m.systemStatus = fmt.Sprintf("ERROR: %v", msg.Err)
 		m.isThinking = false
 	case StatusMsg:
@@ -228,6 +284,7 @@ func (m *ChatModel) startNewRound(input string) {
 }
 
 func (m *ChatModel) handleResponse(content string) {
+	content = filterAdvertisement(content, m.pentestMode)
 	m.aiResponse = content
 	m.isThinking = false
 
@@ -345,8 +402,11 @@ func (m *ChatModel) View() string {
 		thinkingInfo = fmt.Sprintf(" | Thinking: %.1fs", thinkingTime)
 	}
 
-	systemBar := systemStyle.Render(fmt.Sprintf("Agent: %s | Context: %s | Chars: %d/%d%s | %s",
-		m.currentAgent, m.contextInfo, m.charCount, m.charCountTotal, thinkingInfo, m.systemStatus))
+	roundInfo := fmt.Sprintf("Round: %d", len(m.allRounds))
+	charsInfo := fmt.Sprintf("Chars: %d/%d", m.charCount, m.charCountTotal)
+	
+	systemBar := systemStyle.Render(fmt.Sprintf("LLM: %s | Agent: %s | Context: %s | %s | %s%s | %s",
+		m.llmName, m.currentAgent, m.contextInfo, roundInfo, charsInfo, thinkingInfo, m.systemStatus))
 
 	listView := borderStyle.Render(m.conversationList.View())
 	contentView := lipgloss.JoinVertical(lipgloss.Left,
@@ -387,11 +447,25 @@ func (m *ChatModel) SetCurrentAgent(agent string) {
 	m.currentAgent = agent
 }
 
+func (m *ChatModel) SetLLMName(name string) {
+	m.llmName = name
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a
 	}
 	return b
+}
+
+func filterAdvertisement(content string, pentestMode bool) string {
+	var processor *messaging.MessageProcessor
+	if pentestMode {
+		processor = messaging.NewMessageProcessorWithConfig(messaging.PentestConfig())
+	} else {
+		processor = messaging.NewMessageProcessor()
+	}
+	return processor.CleanMessage(content)
 }
 
 type ConversationRoundItem struct {
