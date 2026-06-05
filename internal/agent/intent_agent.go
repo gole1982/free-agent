@@ -20,8 +20,18 @@ const (
 	IntentDebug       IntentType = "DEBUG"       // 调试分析
 	IntentGit         IntentType = "GIT"         // Git操作
 	IntentFeedback    IntentType = "FEEDBACK"    // 结果评估
-	IntentPentest     IntentType = "PENTEST"     // 安全测试
+	// 安全测试类 - 细分
+	IntentSQLi        IntentType = "SQLI"        // SQL注入
+	IntentXSS         IntentType = "XSS"         // XSS
+	IntentCommandInj  IntentType = "CMDINJ"      // 命令注入
+	IntentPathTravers IntentType = "PATHTRAV"    // 路径遍历
+	IntentSSRF        IntentType = "SSRF"        // SSRF
+	IntentFileIncl    IntentType = "FILEINCL"    // 文件包含
+	IntentPentest     IntentType = "PENTEST"     // 综合安全测试
+	IntentCTF         IntentType = "CTF"         // CTF探索
 	IntentChat        IntentType = "CHAT"        // 闲聊/问答
+	IntentProject     IntentType = "PROJECT"     // 复杂项目（需要多Agent协作）
+	IntentExploration IntentType = "EXPLORATION" // 探索式任务（不确定、需要回溯）
 	IntentUnknown     IntentType = "UNKNOWN"     // 未知
 )
 
@@ -58,22 +68,31 @@ const IntentSystemPrompt = `
 You are a Natural Language Understanding system. Your task is to classify user intent.
 
 ## Supported Intents (pick ONE)
-- CODE: Creating websites, writing code, implementing features
+- CODE: Creating websites, writing code, implementing features (simple tasks)
 - PLAN: Planning projects, creating roadmaps
 - REVIEW: Code review, quality analysis
 - TEST: Writing tests
 - DEBUG: Debugging, fixing errors
 - GIT: Git operations
 - FEEDBACK: Evaluating results
-- PENTEST: Security testing
+- SQLI: SQL Injection testing (e.g., "test SQL injection", "SQLi", "' OR 1=1")
+- XSS: XSS testing (e.g., "test XSS", "<script>", "javascript:")
+- CMDINJ: Command Injection testing (e.g., "command injection", "RCE", "; ls")
+- PATHTRAV: Path Traversal testing (e.g., "../", "path traversal", "directory traversal")
+- SSRF: SSRF testing (e.g., "SSRF", "http://127.0.0.1")
+- FILEINCL: File Inclusion testing (e.g., "LFI", "RFI", "file inclusion")
+- PENTEST: Comprehensive security testing (not specific to one vulnerability type)
+- CTF: CTF challenges that may require multiple approaches
 - CHAT: General conversation
+- PROJECT: Complex projects requiring multi-agent collaboration (e.g., "build a complete e-commerce website", "create a full-stack application")
+- EXPLORATION: Uncertain problems requiring exploration, backtracking, multi-branch trial
 - UNKNOWN: Cannot determine
 
 ## Rules
 1. RESPOND WITH ONLY JSON - no explanations, no markdown, no text before or after
 2. Use EXACT field names as shown below
 3. confidence must be between 0.0 and 1.0
-4. agent must be one of: Coder, Planner, Reviewer, Tester, Debugger, Git, Feedback, Pentesting, Orchestrator
+4. agent must be one of: Coder, Planner, Reviewer, Tester, Debugger, Git, Feedback, SQLiAgent, XSSAgent, CommandInjectAgent, PathTraversalAgent, SSRFAgent, FileIncludeAgent, Pentesting, CTFExploration, Generic, Orchestrator
 
 ## Output Format
 {"intent":"INTENT","confidence":0.95,"agent":"AgentName","summary":"brief summary","need_plan":false,"need_review":true}
@@ -81,6 +100,15 @@ You are a Natural Language Understanding system. Your task is to classify user i
 ## Examples
 Input: "创建网页显示天气"
 Output: {"intent":"CODE","confidence":0.95,"agent":"Coder","summary":"Create weather display webpage","need_plan":false,"need_review":true}
+
+Input: "测试DVWA的SQL注入"
+Output: {"intent":"SQLI","confidence":0.98,"agent":"SQLiAgent","summary":"Test SQL injection on DVWA","need_plan":false,"need_review":false}
+
+Input: "测试XSS漏洞"
+Output: {"intent":"XSS","confidence":0.95,"agent":"XSSAgent","summary":"Test XSS vulnerability","need_plan":false,"need_review":false}
+
+Input: "做一个CTF挑战"
+Output: {"intent":"CTF","confidence":0.85,"agent":"CTFExploration","summary":"Solve CTF challenge","need_plan":false,"need_review":false}
 
 Input: "规划项目"
 Output: {"intent":"PLAN","confidence":0.98,"agent":"Planner","summary":"Plan project","need_plan":false,"need_review":false}
@@ -138,36 +166,44 @@ func (a *IntentAgent) fallbackIntentParse(input string) (string, error) {
 	intent := IntentUnknown
 	confidence := 0.5
 
-	keywords := map[string]IntentType{
-		"创建": IntentCode, "写": IntentCode, "实现": IntentCode, "网站": IntentCode,
-		"网页": IntentCode, "函数": IntentCode, "代码": IntentCode, "html": IntentCode,
-		"css": IntentCode, "javascript": IntentCode, "python": IntentCode, "go": IntentCode,
-		
-		"规划": IntentPlan, "计划": IntentPlan, "分解": IntentPlan, "roadmap": IntentPlan,
-		
-		"审查": IntentReview, "review": IntentReview, "检查": IntentReview, "分析": IntentReview,
-		
-		"测试": IntentTest, "test": IntentTest, "用例": IntentTest,
-		
-		"调试": IntentDebug, "debug": IntentDebug, "错误": IntentDebug, "bug": IntentDebug,
-		
-		"git": IntentGit, "commit": IntentGit, "push": IntentGit, "pull": IntentGit,
-		"branch": IntentGit, "仓库": IntentGit, "版本": IntentGit,
-		
-		"评估": IntentFeedback, "反馈": IntentFeedback, "改进": IntentFeedback,
-		
-		"安全": IntentPentest, "渗透": IntentPentest, "ctf": IntentPentest, "漏洞": IntentPentest,
-		"sql注入": IntentPentest, "xss": IntentPentest, "注入": IntentPentest,
+	// 优先匹配更具体的关键词（细分的安全测试）
+	specificKeywords := []struct {
+		keywords []string
+		intent   IntentType
+		conf     float64
+	}{
+		// 安全测试 - 细分
+		{[]string{"sql注入", "sql injection", "sqli", "union select", "' or 1=1"}, IntentSQLi, 0.9},
+		{[]string{"xss", "cross site", "cross-site", "<script>", "javascript:"}, IntentXSS, 0.9},
+		{[]string{"命令注入", "command injection", "rce", "remote code", "; ls", "; dir", "&& ls"}, IntentCommandInj, 0.85},
+		{[]string{"路径遍历", "path traversal", "directory traversal", "../"}, IntentPathTravers, 0.85},
+		{[]string{"ssrf", "server-side request forgery", "http://127.0.0.1", "http://localhost"}, IntentSSRF, 0.85},
+		{[]string{"文件包含", "lfi", "rfi", "file inclusion", "php://filter"}, IntentFileIncl, 0.85},
+		// CTF
+		{[]string{"ctf", "capture the flag"}, IntentCTF, 0.8},
+		// 综合渗透
+		{[]string{"安全测试", "渗透测试", "渗透", "漏洞", "vulnerability"}, IntentPentest, 0.75},
+		// 普通开发
+		{[]string{"创建", "写", "实现", "网站", "网页", "函数", "代码", "html", "css", "javascript", "python", "go"}, IntentCode, 0.8},
+		{[]string{"规划", "计划", "分解", "roadmap"}, IntentPlan, 0.8},
+		{[]string{"审查", "review", "检查", "分析"}, IntentReview, 0.8},
+		{[]string{"测试", "test", "用例"}, IntentTest, 0.8},
+		{[]string{"调试", "debug", "错误", "bug"}, IntentDebug, 0.8},
+		{[]string{"git", "commit", "push", "pull", "branch", "仓库", "版本"}, IntentGit, 0.8},
+		{[]string{"评估", "反馈", "改进"}, IntentFeedback, 0.8},
 	}
 
-	for keyword, intentType := range keywords {
-		if strings.Contains(inputLower, keyword) {
-			intent = intentType
-			confidence = 0.7
-			break
+	for _, sk := range specificKeywords {
+		for _, keyword := range sk.keywords {
+			if strings.Contains(inputLower, keyword) {
+				intent = sk.intent
+				confidence = sk.conf
+				goto FOUND // 找到后直接退出
+			}
 		}
 	}
 
+FOUND:
 	result := IntentResult{
 		Intent:     intent,
 		Confidence: confidence,
@@ -215,7 +251,10 @@ func (a *IntentAgent) formatIntentResult(result *IntentResult) (string, error) {
 func isValidIntent(intent IntentType) bool {
 	validIntents := []IntentType{
 		IntentCode, IntentPlan, IntentReview, IntentTest,
-		IntentDebug, IntentGit, IntentFeedback, IntentPentest,
+		IntentDebug, IntentGit, IntentFeedback,
+		// 安全测试细分
+		IntentSQLi, IntentXSS, IntentCommandInj, IntentPathTravers,
+		IntentSSRF, IntentFileIncl, IntentPentest, IntentCTF,
 		IntentChat, IntentUnknown,
 	}
 
@@ -230,22 +269,30 @@ func isValidIntent(intent IntentType) bool {
 // intentToAgent 意图类型到Agent名称的映射
 func intentToAgent(intent IntentType) string {
 	mapping := map[IntentType]string{
-		IntentCode:     "Coder",
-		IntentPlan:     "Planner",
-		IntentReview:   "Reviewer",
-		IntentTest:     "Tester",
-		IntentDebug:    "Debugger",
-		IntentGit:      "Git",
-		IntentFeedback: "Feedback",
-		IntentPentest:  "Pentesting",
-		IntentChat:     "Orchestrator",
-		IntentUnknown:  "Orchestrator",
+		IntentCode:         "Coder",
+		IntentPlan:         "Planner",
+		IntentReview:       "Reviewer",
+		IntentTest:         "Tester",
+		IntentDebug:        "Debugger",
+		IntentGit:          "Git",
+		IntentFeedback:     "Feedback",
+		// 安全测试细分
+		IntentSQLi:         "SQLiAgent",
+		IntentXSS:          "XSSAgent",
+		IntentCommandInj:   "CommandInjectAgent",
+		IntentPathTravers:  "PathTraversalAgent",
+		IntentSSRF:         "SSRFAgent",
+		IntentFileIncl:     "FileIncludeAgent",
+		IntentPentest:      "Pentesting",
+		IntentCTF:          "CTFExploration",
+		IntentChat:         "Orchestrator",
+		IntentUnknown:      "Generic", // 默认路由到 Generic
 	}
 
 	if agent, ok := mapping[intent]; ok {
 		return agent
 	}
-	return "Orchestrator"
+	return "Generic" // 默认路由
 }
 
 // GetIntentResult 解析并返回结构化的意图结果（供Orchestrator使用）
@@ -324,6 +371,10 @@ func isValidAgentName(name string) bool {
 		"Coder": true, "Planner": true, "Reviewer": true,
 		"Tester": true, "Debugger": true, "Git": true,
 		"Feedback": true, "Pentesting": true, "Orchestrator": true,
+		// 新增的安全测试细分 Agent
+		"SQLiAgent": true, "XSSAgent": true, "CommandInjectAgent": true,
+		"PathTraversalAgent": true, "SSRFAgent": true, "FileIncludeAgent": true,
+		"CTFExploration": true, "Generic": true,
 	}
 	return validAgents[name]
 }

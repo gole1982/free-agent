@@ -44,6 +44,21 @@ func main() {
 		return
 	}
 
+	// 检查是否启用闭环模式 或 路由模式
+	useClosedLoop := false
+	useRouted := false
+	var filteredArgs []string
+	for _, arg := range args {
+		if arg == "-loop" || arg == "--loop" {
+			useClosedLoop = true
+		} else if arg == "-route" || arg == "--route" || arg == "-routed" {
+			useRouted = true
+		} else {
+			filteredArgs = append(filteredArgs, arg)
+		}
+	}
+	args = filteredArgs
+
 	switch args[0] {
 	case "-chat":
 		if err := runChatMode(); err != nil {
@@ -90,13 +105,13 @@ func main() {
 			}
 			
 			if validAgents[args[1]] && len(args) > 2 {
-				if err := runAgent(args[1], strings.Join(args[2:], " ")); err != nil {
+				if err := runAgent(args[1], strings.Join(args[2:], " "), useClosedLoop, useRouted); err != nil {
 					logger.LogProgramError(err)
 					fmt.Fprintln(os.Stderr, err)
 					os.Exit(1)
 				}
 			} else {
-				if err := runAgent("", strings.Join(args[1:], " ")); err != nil {
+				if err := runAgent("", strings.Join(args[1:], " "), useClosedLoop, useRouted); err != nil {
 					logger.LogProgramError(err)
 					fmt.Fprintln(os.Stderr, err)
 					os.Exit(1)
@@ -115,39 +130,139 @@ func main() {
 func printHelp() {
 	fmt.Println(`Free Agent - Multi-AI Agent System for Software Engineering
 
-Usage:
-  free-agent              Start interactive UI with temp session
-  free-agent -chat        Start chat-only mode
+  A harness engineering architecture for AI-powered software development.
+  Features: multi-agent collaboration, session management, CI/CD integration,
+  self-learning closed-loop system with PD-WC-RI architecture.
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                        COMMAND LINE ARGUMENTS                            ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+  free-agent              Launch interactive UI with temporary session
+  free-agent -chat        Start command-line chat mode
   free-agent -session     List all saved sessions
-  free-agent -session <name>  Restore a specific session
+  free-agent -session <name>  Restore specific session
   free-agent -agent       List all available agents
-  free-agent -agent <name> <input>  Execute an agent
-  free-agent -check       Check system status and API connection
+  free-agent -agent <name> <input>  Execute specific agent
+  free-agent -loop/--loop <input>  Use 3-layer closed-loop (PD-WC-RI) mode
+  free-agent -route/--route/-routed <input>  Use IP-style routing table mode (推荐)
+  free-agent -check       Check system status and API connectivity
   free-agent -clean       Clean up all temporary sessions
   free-agent -help        Show this help message
 
-Commands:
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                          UI COMMANDS (In-chat)                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
   /save <name>            Save current session with project name
   /quit                   Exit and save (if project name is set)
-  /forcequit              Exit without saving
+                          Prompts for name if not set
+  /forcequit              Exit immediately without saving
 
-Examples:
-  free-agent              # Launch UI with temp session
-  free-agent -chat        # Start command-line chat mode
-  free-agent -session     # List all sessions
-  free-agent -session myproject  # Restore 'myproject' session
-  free-agent -agent       # List all agents
-  free-agent -agent Planner "Build a todo app"  # Use Planner agent
-  free-agent -agent Coder "Write a Python function"  # Use Coder agent
-  free-agent -check       # Check license and API connectivity
-  free-agent -clean       # Clean all temp sessions
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                                EXAMPLES                                  ║
+╚═══════════════════════════════════════════════════════════════════════════╝
 
-Configuration:
-  Create .env file with:
-    API_BYOK=false        # Use custom API key (true/false)
-    API_URL=              # LLM API endpoint
-    API_KEY=              # API key (required if BYOK=true)
-    DIRECTORY_STARTUP=./projects  # Project parent directory
+  # Start UI with temp session (auto-named: tmp_YYYYMMDD_XX)
+  free-agent
+
+  # Chat mode without UI
+  free-agent -chat
+
+  # List all saved sessions
+  free-agent -session
+
+  # Restore a saved project
+  free-agent -session weather-app
+
+  # Use specific agent
+  free-agent -agent Coder "Create a weather website"
+  free-agent -agent Planner "Plan an e-commerce project"
+
+  # Use closed-loop mode (with auto-improvement)
+  free-agent -loop "Create a weather website"
+  free-agent -agent -loop Coder "Create a weather website"
+
+  # Check system status
+  free-agent -check
+
+  # Clean all temp sessions
+  free-agent -clean
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                         CLOSED-LOOP ARCHITECTURE                         ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+  📋 Execution Layer (PD) - Plan → Do
+     • Plan: Intent analysis + task planning
+     • Do: Specialized agent execution
+
+  👁️ Supervision Layer (WC) - Watch → Correct
+     • Watch: Real-time quality monitoring
+     • Correct: Error correction & refinement
+
+  🏛️ Management Layer (RI) - Review → Improve
+     • Review: Quality evaluation & scoring
+     • Improve: Agent trait adjustment & learning
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                         AVAILABLE AGENTS                                  ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+  • Management & Assistance
+    Orchestrator  - Task orchestrator (auto-selects best agent)
+    IntentAgent   - Intent analysis & classification
+    Planner       - Task planning and project decomposition
+    Explorer      - Uncertain task exploration (tree-based)
+
+  • Execution
+    Coder         - Code generation and implementation
+    Pentesting    - Comprehensive security testing
+    SQLiAgent     - SQL Injection testing
+    XSSAgent      - XSS vulnerability testing
+    CommandInjectAgent - Command injection testing
+    PathTraversalAgent - Path traversal testing
+    SSRFAgent     - SSRF attack testing
+    FileIncludeAgent - File inclusion testing
+    CTFExploration - General CTF exploration
+
+  • Quality & Learning
+    Reviewer      - Code review and quality analysis
+    Tester        - Test case generation and automation
+    Debugger      - Debugging assistance
+    Feedback      - Result evaluation and suggestions
+    Git           - Version control operations
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                         CONFIGURATION (.env)                             ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+  API_BYOK=false        # Use custom API key (true/false)
+  API_URL=              # LLM API endpoint URL
+  API_KEY=              # API key (required if BYOK=true)
+  API_NAME=Free LLM     # Display name for LLM
+  DIRECTORY_STARTUP=./projects  # Project storage directory
+  PROGRAM_LOG_NAME=free-agent.log  # Program log file
+  PROGRAM_LOG_LEVEL=info  # Log level: debug, info, warn, error
+  PENTESTING_ENABLED=false  # Enable pentesting mode
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                        SESSION MANAGEMENT                                ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+  • Temp Sessions: Auto-created as tmp_YYYYMMDD_XX, auto-cleaned on exit
+  • Saved Sessions: Use /save <name> to persist sessions
+  • Session Restore: free-agent -session <name> to restore
+  • Cleanup: free-agent -clean removes all temp sessions
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                          ARCHITECTURE                                    ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+  Core Control Layer: Policy Engine, Constraint Manager, Safety Guardrails
+  Agent Layer: Specialized AI agents for different tasks
+  Messaging Layer: Unified message processing and filtering
+  UI Layer: Interactive chat interface with session management
 
 For more details, see README.md`)
 }
@@ -182,13 +297,16 @@ Examples:
   free-agent -agent Git "add . && commit -m 'update'"`)
 }
 
-func runAgent(agentName, input string) error {
+func runAgent(agentName, input string, useClosedLoop, useRouted bool) error {
 	progCfg, err := config.LoadProgramConfig()
 	if err != nil {
 		return err
 	}
 
 	gateway := llm.NewSimpleGateway(progCfg.API.URL, progCfg.API.Key, progCfg.API.BYOK)
+	
+	// 创建LLM Client用于需要它的Agent
+	llmClient := llm.NewClient(progCfg.API.URL, progCfg.API.Key, progCfg.API.BYOK)
 
 	am := agent.NewAgentManager()
 	am.RegisterAgent(agent.NewPlannerAgent(gateway))
@@ -199,12 +317,103 @@ func runAgent(agentName, input string) error {
 	am.RegisterAgent(agent.NewGitAgent("."))
 	am.RegisterAgent(agent.NewFeedbackAgent(gateway))
 	am.RegisterAgent(agent.NewPentestingAgent(progCfg))
+	
+	// 注册新的安全测试细分 Agent
+	am.RegisterAgent(agent.NewSQLiAgent(llmClient))
+	am.RegisterAgent(agent.NewXSSAgent(llmClient))
+	am.RegisterAgent(agent.NewCommandInjectAgent(llmClient))
+	am.RegisterAgent(agent.NewPathTraversalAgent(llmClient))
+	am.RegisterAgent(agent.NewSSRFAgent(llmClient))
+	am.RegisterAgent(agent.NewFileIncludeAgent(llmClient))
+	am.RegisterAgent(agent.NewCTFExploration(llmClient))
+	
+	// 注册 Generic Agent (默认路由)
+	am.RegisterAgent(agent.NewGenericAgent(llmClient))
+
+	explorer := agent.NewExplorationAgent(gateway, am)
+	am.RegisterAgent(explorer)
 
 	orchestrator := agent.NewOrchestratorAgent(gateway, am)
 	am.RegisterAgent(orchestrator)
 
+	// =============================================
+	// 初始化路由式Orchestrator
+	// =============================================
+	routedOrchestrator := agent.NewRoutedOrchestrator(am)
+	am.RegisterAgent(routedOrchestrator)
+
+	// =============================================
+	// 初始化三层闭环管理器
+	// =============================================
+	closedLoopMgr := agent.NewClosedLoopManager(llmClient, am)
+	
+	// 注册 Agent 特质 (用于自学习)
+	closedLoopMgr.RegisterAgentTraits("Intent", &agent.AgentTraits{
+		Name:          "Intent",
+		Efficiency:    0.7,
+		Quality:       0.75,
+		Creativity:    0.5,
+		Collaboration: 0.8,
+		LearningRate:  0.1,
+	})
+	
+	closedLoopMgr.RegisterAgentTraits("Orchestrator", &agent.AgentTraits{
+		Name:          "Orchestrator",
+		Efficiency:    0.75,
+		Quality:       0.8,
+		Creativity:    0.7,
+		Collaboration: 0.9,
+		LearningRate:  0.12,
+	})
+	
+	closedLoopMgr.RegisterAgentTraits("Coder", &agent.AgentTraits{
+		Name:          "Coder",
+		Efficiency:    0.8,
+		Quality:       0.7,
+		Creativity:    0.75,
+		Collaboration: 0.7,
+		LearningRate:  0.1,
+	})
+	
+	closedLoopMgr.RegisterAgentTraits("Pentesting", &agent.AgentTraits{
+		Name:          "Pentesting",
+		Efficiency:    0.7,
+		Quality:       0.75,
+		Creativity:    0.8,
+		Collaboration: 0.65,
+		LearningRate:  0.1,
+	})
+
 	ctx := context.Background()
-	if agentName == "Orchestrator" || agentName == "" {
+	
+	// =============================================
+	// 选择执行模式
+	// =============================================
+	if useRouted {
+		fmt.Println("\n" + strings.Repeat("=", 80))
+		fmt.Println("🛣️ EXECUTING WITH ROUTED ORCHESTRATOR (IP-LIKE ROUTING TABLE)")
+		fmt.Println(strings.Repeat("=", 80))
+		
+		// 使用路由式Orchestrator
+		result, err := routedOrchestrator.Execute(ctx, input)
+		if err != nil {
+			return err
+		}
+		fmt.Println("\n📋 FINAL RESULT:")
+		fmt.Println(result)
+	} else if useClosedLoop {
+		fmt.Println("\n" + strings.Repeat("=", 80))
+		fmt.Println("🔄 EXECUTING WITH CLOSED-LOOP (PD-WC-RI)")
+		fmt.Println(strings.Repeat("=", 80))
+		
+		// 使用三层闭环执行
+		result, err := closedLoopMgr.ExecuteWithLoop(ctx, input)
+		if err != nil {
+			return err
+		}
+		fmt.Println("\n📋 FINAL RESULT:")
+		fmt.Println(result)
+	} else if agentName == "Orchestrator" || agentName == "" {
 		result, err := orchestrator.Execute(ctx, input)
 		if err != nil {
 			return err
@@ -464,6 +673,24 @@ func runUIChat(sessionTitle string) error {
 	am.RegisterAgent(agent.NewGitAgent(sessionDir))
 	am.RegisterAgent(agent.NewFeedbackAgent(gateway))
 	am.RegisterAgent(agent.NewPentestingAgent(progCfg))
+	
+	// 创建LLM Client用于需要它的Agent
+	llmClient := llm.NewClient(progCfg.API.URL, progCfg.API.Key, progCfg.API.BYOK)
+	
+	// 注册新的安全测试细分 Agent
+	am.RegisterAgent(agent.NewSQLiAgent(llmClient))
+	am.RegisterAgent(agent.NewXSSAgent(llmClient))
+	am.RegisterAgent(agent.NewCommandInjectAgent(llmClient))
+	am.RegisterAgent(agent.NewPathTraversalAgent(llmClient))
+	am.RegisterAgent(agent.NewSSRFAgent(llmClient))
+	am.RegisterAgent(agent.NewFileIncludeAgent(llmClient))
+	am.RegisterAgent(agent.NewCTFExploration(llmClient))
+	
+	// 注册 Generic Agent (默认路由)
+	am.RegisterAgent(agent.NewGenericAgent(llmClient))
+
+	explorer := agent.NewExplorationAgent(gateway, am)
+	am.RegisterAgent(explorer)
 
 	orchestrator := agent.NewOrchestratorAgent(gateway, am)
 	am.RegisterAgent(orchestrator)
