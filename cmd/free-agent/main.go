@@ -44,21 +44,6 @@ func main() {
 		return
 	}
 
-	// 检查是否启用闭环模式 或 路由模式
-	useClosedLoop := false
-	useRouted := false
-	var filteredArgs []string
-	for _, arg := range args {
-		if arg == "-loop" || arg == "--loop" {
-			useClosedLoop = true
-		} else if arg == "-route" || arg == "--route" || arg == "-routed" {
-			useRouted = true
-		} else {
-			filteredArgs = append(filteredArgs, arg)
-		}
-	}
-	args = filteredArgs
-
 	switch args[0] {
 	case "-chat":
 		if err := runChatMode(); err != nil {
@@ -90,40 +75,13 @@ func main() {
 		}
 	case "-help":
 		printHelp()
-	case "-agent":
-		if len(args) > 1 {
-			validAgents := map[string]bool{
-				"Orchestrator": true,
-				"Planner":      true,
-				"Coder":        true,
-				"Reviewer":     true,
-				"Tester":       true,
-				"Debugger":     true,
-				"Git":          true,
-				"Feedback":     true,
-				"Pentesting":   true,
-			}
-			
-			if validAgents[args[1]] && len(args) > 2 {
-				if err := runAgent(args[1], strings.Join(args[2:], " "), useClosedLoop, useRouted); err != nil {
-					logger.LogProgramError(err)
-					fmt.Fprintln(os.Stderr, err)
-					os.Exit(1)
-				}
-			} else {
-				if err := runAgent("", strings.Join(args[1:], " "), useClosedLoop, useRouted); err != nil {
-					logger.LogProgramError(err)
-					fmt.Fprintln(os.Stderr, err)
-					os.Exit(1)
-				}
-			}
-		} else {
-			printAgentHelp()
-		}
 	default:
-		fmt.Printf("Unknown option: %s\n", args[0])
-		printHelp()
-		os.Exit(1)
+		// 直接接受任务，使用三层闭环系统
+		if err := runTask(strings.Join(args, " ")); err != nil {
+			logger.LogProgramError(err)
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	}
 }
 
@@ -132,23 +90,36 @@ func printHelp() {
 
   A harness engineering architecture for AI-powered software development.
   Features: multi-agent collaboration, session management, CI/CD integration,
-  self-learning closed-loop system with PD-WC-RI architecture.
+  self-learning three-layer closed-loop architecture.
 
 ╔═══════════════════════════════════════════════════════════════════════════╗
 ║                        COMMAND LINE ARGUMENTS                            ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 
   free-agent              Launch interactive UI with temporary session
+  free-agent <task>      Execute task using three-layer closed-loop system
   free-agent -chat        Start command-line chat mode
   free-agent -session     List all saved sessions
   free-agent -session <name>  Restore specific session
-  free-agent -agent       List all available agents
-  free-agent -agent <name> <input>  Execute specific agent
-  free-agent -loop/--loop <input>  Use 3-layer closed-loop (PD-WC-RI) mode
-  free-agent -route/--route/-routed <input>  Use IP-style routing table mode (推荐)
   free-agent -check       Check system status and API connectivity
   free-agent -clean       Clean up all temporary sessions
   free-agent -help        Show this help message
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                      THREE-LAYER CLOSED-LOOP ARCHITECTURE              ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+  1. EXECUTION LAYER - Responsible for all task execution
+     • Plan: Intent analysis + task decomposition
+     • Execute: Route matching selects best agent for the task
+
+  2. CONTROL LAYER - Real-time monitoring and correction
+     • Watch: Monitor execution quality and collect metrics
+     • Correct: Auto-correct errors and issues
+
+  3. MANAGEMENT LAYER - Review and optimize
+     • Review: Evaluate results and performance
+     • Improve: Adjust agent traits based on learning
 
 ╔═══════════════════════════════════════════════════════════════════════════╗
 ║                          UI COMMANDS (In-chat)                           ║
@@ -166,6 +137,11 @@ func printHelp() {
   # Start UI with temp session (auto-named: tmp_YYYYMMDD_XX)
   free-agent
 
+  # Execute task directly (uses closed-loop system
+  free-agent "Create a weather website"
+  free-agent "Test SQL injection on target"
+  free-agent "Plan an e-commerce project"
+
   # Chat mode without UI
   free-agent -chat
 
@@ -175,14 +151,6 @@ func printHelp() {
   # Restore a saved project
   free-agent -session weather-app
 
-  # Use specific agent
-  free-agent -agent Coder "Create a weather website"
-  free-agent -agent Planner "Plan an e-commerce project"
-
-  # Use closed-loop mode (with auto-improvement)
-  free-agent -loop "Create a weather website"
-  free-agent -agent -loop Coder "Create a weather website"
-
   # Check system status
   free-agent -check
 
@@ -190,30 +158,33 @@ func printHelp() {
   free-agent -clean
 
 ╔═══════════════════════════════════════════════════════════════════════════╗
-║                         CLOSED-LOOP ARCHITECTURE                         ║
+║                         CLOSED-LOOP EXECUTION DETAILS                         ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 
-  📋 Execution Layer (PD) - Plan → Do
-     • Plan: Intent analysis + task planning
-     • Do: Specialized agent execution
+  📋 EXECUTION LAYER (Plan → Execute
+     • Intent analysis and task planning
+     • Route matching selects appropriate agent
+     • Agent execution of the planned tasks
 
-  👁️ Supervision Layer (WC) - Watch → Correct
-     • Watch: Real-time quality monitoring
-     • Correct: Error correction & refinement
+  👁️ CONTROL LAYER (Watch → Correct
+     • Real-time quality monitoring and metrics collection
+     • Error detection and automatic correction
+     • Performance tracking and issue reporting
 
-  🏛️ Management Layer (RI) - Review → Improve
-     • Review: Quality evaluation & scoring
-     • Improve: Agent trait adjustment & learning
+  🏛️ MANAGEMENT LAYER (Review → Improve
+     • Result evaluation and scoring
+     • Agent trait adjustment based on performance
+     • Learning and optimization over time
 
 ╔═══════════════════════════════════════════════════════════════════════════╗
 ║                         AVAILABLE AGENTS                                  ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 
   • Management & Assistance
-    Orchestrator  - Task orchestrator (auto-selects best agent)
     IntentAgent   - Intent analysis & classification
     Planner       - Task planning and project decomposition
     Explorer      - Uncertain task exploration (tree-based)
+    GenericAgent  - General purpose task handling
 
   • Execution
     Coder         - Code generation and implementation
@@ -246,7 +217,7 @@ func printHelp() {
   PROGRAM_LOG_LEVEL=info  # Log level: debug, info, warn, error
   PENTESTING_ENABLED=false  # Enable pentesting mode
 
-╔═══════════════════════════════════════════════════════════════════════════╗
+╔═══════════════════════════════════════════════════════════════════════════╝
 ║                        SESSION MANAGEMENT                                ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 
@@ -255,49 +226,10 @@ func printHelp() {
   • Session Restore: free-agent -session <name> to restore
   • Cleanup: free-agent -clean removes all temp sessions
 
-╔═══════════════════════════════════════════════════════════════════════════╗
-║                          ARCHITECTURE                                    ║
-╚═══════════════════════════════════════════════════════════════════════════╝
-
-  Core Control Layer: Policy Engine, Constraint Manager, Safety Guardrails
-  Agent Layer: Specialized AI agents for different tasks
-  Messaging Layer: Unified message processing and filtering
-  UI Layer: Interactive chat interface with session management
-
 For more details, see README.md`)
 }
 
-func printAgentHelp() {
-	fmt.Println(`Available Agents:
-
-  Orchestrator - Task orchestrator (auto-selects best agent)
-  Planner      - Task planning and decomposition
-  Coder        - Code generation and implementation
-  Reviewer     - Code review and quality analysis
-  Tester       - Test case generation and execution
-  Debugger     - Error analysis and debugging
-  Feedback     - Result evaluation and improvement suggestions
-  Pentesting   - CTF and penetration testing support
-  Git          - Version control operations
-
-Usage:
-  free-agent -agent <agent_name> <input>
-  free-agent -agent <input>         # Use Orchestrator to auto-select
-
-Examples:
-  free-agent -agent "Build a web application"  # Auto-select agent
-  free-agent -agent Orchestrator "Write code"  # Use orchestrator
-  free-agent -agent Planner "Build a web application"
-  free-agent -agent Coder "Write a Go HTTP server"
-  free-agent -agent Reviewer "func foo() { return 1 }"
-  free-agent -agent Tester "Python function to add two numbers"
-  free-agent -agent Debugger "Runtime error: index out of range"
-  free-agent -agent Feedback "Please evaluate this code..."
-  free-agent -agent Pentesting "' OR 1=1--"  # Analyze payload
-  free-agent -agent Git "add . && commit -m 'update'"`)
-}
-
-func runAgent(agentName, input string, useClosedLoop, useRouted bool) error {
+func runTask(input string) error {
 	progCfg, err := config.LoadProgramConfig()
 	if err != nil {
 		return err
@@ -309,6 +241,7 @@ func runAgent(agentName, input string, useClosedLoop, useRouted bool) error {
 	llmClient := llm.NewClient(progCfg.API.URL, progCfg.API.Key, progCfg.API.BYOK)
 
 	am := agent.NewAgentManager()
+	am.RegisterAgent(agent.NewIntentAgent(gateway))
 	am.RegisterAgent(agent.NewPlannerAgent(gateway))
 	am.RegisterAgent(agent.NewCoderAgent(gateway, "."))
 	am.RegisterAgent(agent.NewReviewerAgent(gateway))
@@ -337,95 +270,61 @@ func runAgent(agentName, input string, useClosedLoop, useRouted bool) error {
 	am.RegisterAgent(orchestrator)
 
 	// =============================================
-	// 初始化路由式Orchestrator
+	// 初始化三层闭环管理器 (用于迭代执行)
 	// =============================================
-	routedOrchestrator := agent.NewRoutedOrchestrator(am)
-	am.RegisterAgent(routedOrchestrator)
-
-	// =============================================
-	// 初始化三层闭环管理器
-	// =============================================
-	closedLoopMgr := agent.NewClosedLoopManager(llmClient, am)
+	// 先创建 SkillLoader
+	skillLoader := agent.NewSkillLoader("skills")
 	
-	// 注册 Agent 特质 (用于自学习)
-	closedLoopMgr.RegisterAgentTraits("Intent", &agent.AgentTraits{
-		Name:          "Intent",
-		Efficiency:    0.7,
-		Quality:       0.75,
-		Creativity:    0.5,
-		Collaboration: 0.8,
-		LearningRate:  0.1,
-	})
+	closedLoopMgr := agent.NewClosedLoopManager(llmClient, am, skillLoader)
 	
-	closedLoopMgr.RegisterAgentTraits("Orchestrator", &agent.AgentTraits{
-		Name:          "Orchestrator",
-		Efficiency:    0.75,
-		Quality:       0.8,
-		Creativity:    0.7,
-		Collaboration: 0.9,
-		LearningRate:  0.12,
-	})
+	// 从 SKILL.md 加载 Agent 特质
+	agentNames := []string{
+		"Intent", "Coder", "Planner", "Reviewer", "Tester", "Debugger", 
+		"Git", "Feedback", "Pentesting", "SQLiAgent", "XSSAgent",
+		"CommandInjectAgent", "PathTraversalAgent", "SSRFAgent",
+		"FileIncludeAgent", "CTFExploration", "Generic Agent", 
+		"Exploration", "Orchestrator",
+	}
 	
-	closedLoopMgr.RegisterAgentTraits("Coder", &agent.AgentTraits{
-		Name:          "Coder",
-		Efficiency:    0.8,
-		Quality:       0.7,
-		Creativity:    0.75,
-		Collaboration: 0.7,
-		LearningRate:  0.1,
-	})
-	
-	closedLoopMgr.RegisterAgentTraits("Pentesting", &agent.AgentTraits{
-		Name:          "Pentesting",
-		Efficiency:    0.7,
-		Quality:       0.75,
-		Creativity:    0.8,
-		Collaboration: 0.65,
-		LearningRate:  0.1,
-	})
+	for _, name := range agentNames {
+		skill, err := skillLoader.LoadSkill(name)
+		if err == nil && skill.Metrics != nil {
+			// 确保 LearningRate 有默认值
+			if skill.Metrics.LearningRate == 0 {
+				skill.Metrics.LearningRate = 0.1
+			}
+			closedLoopMgr.RegisterAgentTraits(name, skill.Metrics)
+			fmt.Printf("Loaded skill for agent: %s\n", name)
+		} else {
+			// 如果找不到 SKILL.md，使用默认值
+			defaultTraits := &agent.AgentTraits{
+				Name:          name,
+				Efficiency:    0.7,
+				Quality:       0.7,
+				Creativity:    0.7,
+				Collaboration: 0.7,
+				LearningRate:  0.1,
+			}
+			closedLoopMgr.RegisterAgentTraits(name, defaultTraits)
+			fmt.Printf("Using default traits for agent: %s (err: %v)\n", name, err)
+		}
+	}
 
 	ctx := context.Background()
 	
 	// =============================================
-	// 选择执行模式
+	// 使用三层闭环系统执行
 	// =============================================
-	if useRouted {
-		fmt.Println("\n" + strings.Repeat("=", 80))
-		fmt.Println("🛣️ EXECUTING WITH ROUTED ORCHESTRATOR (IP-LIKE ROUTING TABLE)")
-		fmt.Println(strings.Repeat("=", 80))
-		
-		// 使用路由式Orchestrator
-		result, err := routedOrchestrator.Execute(ctx, input)
-		if err != nil {
-			return err
-		}
-		fmt.Println("\n📋 FINAL RESULT:")
-		fmt.Println(result)
-	} else if useClosedLoop {
-		fmt.Println("\n" + strings.Repeat("=", 80))
-		fmt.Println("🔄 EXECUTING WITH CLOSED-LOOP (PD-WC-RI)")
-		fmt.Println(strings.Repeat("=", 80))
-		
-		// 使用三层闭环执行
-		result, err := closedLoopMgr.ExecuteWithLoop(ctx, input)
-		if err != nil {
-			return err
-		}
-		fmt.Println("\n📋 FINAL RESULT:")
-		fmt.Println(result)
-	} else if agentName == "Orchestrator" || agentName == "" {
-		result, err := orchestrator.Execute(ctx, input)
-		if err != nil {
-			return err
-		}
-		fmt.Println(result)
-	} else {
-		result, err := am.Execute(ctx, agentName, input)
-		if err != nil {
-			return err
-		}
-		fmt.Println(result)
+	result, err := closedLoopMgr.ExecuteWithLoop(ctx, input)
+	
+	if err != nil {
+		return err
 	}
+	
+	fmt.Println("\n" + strings.Repeat("=", 80))
+	fmt.Println("📋 FINAL RESULT")
+	fmt.Println(strings.Repeat("=", 80))
+	fmt.Println(result)
 
 	return nil
 }
@@ -501,6 +400,9 @@ func runChatMode() error {
 	defer store.Close()
 
 	gateway := llm.NewSimpleGateway(progCfg.API.URL, progCfg.API.Key, progCfg.API.BYOK)
+	
+	// 创建LLM Client用于需要它的Agent
+	llmClient := llm.NewClient(progCfg.API.URL, progCfg.API.Key, progCfg.API.BYOK)
 
 	conv, err := store.CreateConversation("chat")
 	if err != nil {
@@ -509,7 +411,75 @@ func runChatMode() error {
 	}
 	currentConvID = conv.ID
 
-	fmt.Println("=== Chat Mode ===")
+	am := agent.NewAgentManager()
+	am.RegisterAgent(agent.NewIntentAgent(gateway))
+	am.RegisterAgent(agent.NewPlannerAgent(gateway))
+	am.RegisterAgent(agent.NewCoderAgent(gateway, sessionDir))
+	am.RegisterAgent(agent.NewReviewerAgent(gateway))
+	am.RegisterAgent(agent.NewTesterAgent(gateway))
+	am.RegisterAgent(agent.NewDebuggerAgent(gateway))
+	am.RegisterAgent(agent.NewGitAgent(sessionDir))
+	am.RegisterAgent(agent.NewFeedbackAgent(gateway))
+	am.RegisterAgent(agent.NewPentestingAgent(progCfg))
+	
+	// 注册新的安全测试细分 Agent
+	am.RegisterAgent(agent.NewSQLiAgent(llmClient))
+	am.RegisterAgent(agent.NewXSSAgent(llmClient))
+	am.RegisterAgent(agent.NewCommandInjectAgent(llmClient))
+	am.RegisterAgent(agent.NewPathTraversalAgent(llmClient))
+	am.RegisterAgent(agent.NewSSRFAgent(llmClient))
+	am.RegisterAgent(agent.NewFileIncludeAgent(llmClient))
+	am.RegisterAgent(agent.NewCTFExploration(llmClient))
+	
+	// 注册 Generic Agent (默认路由)
+	am.RegisterAgent(agent.NewGenericAgent(llmClient))
+
+	explorer := agent.NewExplorationAgent(gateway, am)
+	am.RegisterAgent(explorer)
+
+	orchestrator := agent.NewOrchestratorAgent(gateway, am)
+	am.RegisterAgent(orchestrator)
+
+	// 初始化三层闭环管理器
+	// 先创建 SkillLoader
+	skillLoader := agent.NewSkillLoader("skills")
+	
+	closedLoopMgr := agent.NewClosedLoopManager(llmClient, am, skillLoader)
+	
+	// 从 SKILL.md 加载 Agent 特质
+	agentNames := []string{
+		"Intent", "Coder", "Planner", "Reviewer", "Tester", "Debugger", 
+		"Git", "Feedback", "Pentesting", "SQLiAgent", "XSSAgent",
+		"CommandInjectAgent", "PathTraversalAgent", "SSRFAgent",
+		"FileIncludeAgent", "CTFExploration", "Generic Agent", 
+		"Exploration", "Orchestrator",
+	}
+	
+	for _, name := range agentNames {
+		skill, err := skillLoader.LoadSkill(name)
+		if err == nil && skill.Metrics != nil {
+			// 确保 LearningRate 有默认值
+			if skill.Metrics.LearningRate == 0 {
+				skill.Metrics.LearningRate = 0.1
+			}
+			closedLoopMgr.RegisterAgentTraits(name, skill.Metrics)
+			fmt.Printf("Loaded skill for agent: %s\n", name)
+		} else {
+			// 如果找不到 SKILL.md，使用默认值
+			defaultTraits := &agent.AgentTraits{
+				Name:          name,
+				Efficiency:    0.7,
+				Quality:       0.7,
+				Creativity:    0.7,
+				Collaboration: 0.7,
+				LearningRate:  0.1,
+			}
+			closedLoopMgr.RegisterAgentTraits(name, defaultTraits)
+			fmt.Printf("Using default traits for agent: %s (err: %v)\n", name, err)
+		}
+	}
+
+	fmt.Println("=== Chat Mode (Three-Layer Closed-Loop System ===")
 	fmt.Println("Type '/quit' to save and exit")
 
 	scanner := bufio.NewScanner(os.Stdin)
@@ -544,10 +514,13 @@ func runChatMode() error {
 		}
 		fullPrompt := history + "user: " + input
 
-		fmt.Println("AI is thinking...")
-		response, err := gateway.Chat(fullPrompt)
+		fmt.Println("\n" + strings.Repeat("=", 80))
+		fmt.Println("AI is thinking (three-layer closed-loop)...")
+
+		// 使用三层闭环系统执行
+		response, err := closedLoopMgr.ExecuteWithLoop(context.Background(), fullPrompt)
 		if err != nil {
-			logger.ProcessError("API request failed: %v", err)
+			logger.ProcessError("Closed-loop system error: %v", err)
 			fmt.Printf("Error: %v\n", err)
 			continue
 		}
@@ -555,8 +528,10 @@ func runChatMode() error {
 		store.AddMessage(conv.ID, "user", input)
 		store.AddMessage(conv.ID, "assistant", response)
 
-		fmt.Println("\nAI:", response)
-		fmt.Println("-" + strings.Repeat("-", 60))
+		fmt.Println("\n" + strings.Repeat("=", 80))
+		fmt.Println("Result:")
+		fmt.Println(response)
+		fmt.Println(strings.Repeat("=", 80))
 	}
 
 	return scanner.Err()
@@ -663,8 +638,9 @@ func runUIChat(sessionTitle string) error {
 
 	gateway := llm.NewSimpleGateway(progCfg.API.URL, progCfg.API.Key, progCfg.API.BYOK)
 
-	// Initialize Agent Manager and Orchestrator
+	// Initialize Agent Manager
 	am := agent.NewAgentManager()
+	am.RegisterAgent(agent.NewIntentAgent(gateway))
 	am.RegisterAgent(agent.NewPlannerAgent(gateway))
 	am.RegisterAgent(agent.NewCoderAgent(gateway, sessionDir))
 	am.RegisterAgent(agent.NewReviewerAgent(gateway))
@@ -694,6 +670,45 @@ func runUIChat(sessionTitle string) error {
 
 	orchestrator := agent.NewOrchestratorAgent(gateway, am)
 	am.RegisterAgent(orchestrator)
+
+	// 初始化三层闭环管理器
+	// 先创建 SkillLoader
+	skillLoader := agent.NewSkillLoader("skills")
+	
+	closedLoopMgr := agent.NewClosedLoopManager(llmClient, am, skillLoader)
+	
+	// 从 SKILL.md 加载 Agent 特质
+	agentNames := []string{
+		"Intent", "Coder", "Planner", "Reviewer", "Tester", "Debugger", 
+		"Git", "Feedback", "Pentesting", "SQLiAgent", "XSSAgent",
+		"CommandInjectAgent", "PathTraversalAgent", "SSRFAgent",
+		"FileIncludeAgent", "CTFExploration", "Generic Agent", 
+		"Exploration", "Orchestrator",
+	}
+	
+	for _, name := range agentNames {
+		skill, err := skillLoader.LoadSkill(name)
+		if err == nil && skill.Metrics != nil {
+			// 确保 LearningRate 有默认值
+			if skill.Metrics.LearningRate == 0 {
+				skill.Metrics.LearningRate = 0.1
+			}
+			closedLoopMgr.RegisterAgentTraits(name, skill.Metrics)
+			fmt.Printf("Loaded skill for agent: %s\n", name)
+		} else {
+			// 如果找不到 SKILL.md，使用默认值
+			defaultTraits := &agent.AgentTraits{
+				Name:          name,
+				Efficiency:    0.7,
+				Quality:       0.7,
+				Creativity:    0.7,
+				Collaboration: 0.7,
+				LearningRate:  0.1,
+			}
+			closedLoopMgr.RegisterAgentTraits(name, defaultTraits)
+			fmt.Printf("Using default traits for agent: %s (err: %v)\n", name, err)
+		}
+	}
 
 	llmName, err := gateway.Chat("What is your name or model name? Please respond with only the name, nothing else.")
 	if err != nil {
@@ -737,10 +752,10 @@ func runUIChat(sessionTitle string) error {
 				return
 			}
 
-			fullPrompt := buildPrompt(store, convID, input)
-			response, err := orchestrator.Execute(context.Background(), fullPrompt)
+			// 使用三层闭环系统执行任务
+			response, err := closedLoopMgr.ExecuteWithLoop(context.Background(), input)
 			if err != nil {
-				logger.ProcessError("Orchestrator error: %v", err)
+				logger.ProcessError("Closed-loop manager error: %v", err)
 				errorChan <- err
 				continue
 			}
@@ -760,7 +775,7 @@ func runUIChat(sessionTitle string) error {
 
 	model := ui.NewChatModel(80, 24, inputChan, responseChan, errorChan, saveChan, progCfg.Pentesting.Enabled)
 	model.SetContextInfo(fmt.Sprintf("Conv #%d", convID))
-	model.SetCurrentAgent("Orchestrator")
+	model.SetCurrentAgent("Closed-Loop System")
 	model.SetLLMName(llmName)
 
 	p := tea.NewProgram(model, tea.WithAltScreen())
