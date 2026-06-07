@@ -252,14 +252,24 @@ func (s *Scheduler) executeAgentOnce(ctx context.Context, agentName string, task
 func (s *Scheduler) selectExecutorFromIntent(intentResult string) string {
 	lower := strings.ToLower(intentResult)
 	
-	// 硬编码的匹配规则
+	// 硬编码的匹配规则 - 对应OWASP Top 10和行业术语
 	switch {
 	case strings.Contains(lower, "pentest") || strings.Contains(lower, "security"):
 		return "SecurityAssessor"
 	case strings.Contains(lower, "sql"):
-		return "SQLInjectionScanner"
+		return "SQLInjectionScanner" // OWASP A03
 	case strings.Contains(lower, "xss"):
-		return "XSSScanner"
+		return "XSSScanner" // OWASP A03
+	case strings.Contains(lower, "command") || strings.Contains(lower, "inject"):
+		return "CommandInjectionScanner" // OWASP A03
+	case strings.Contains(lower, "path") || strings.Contains(lower, "traversal"):
+		return "PathTraversalScanner" // OWASP A01
+	case strings.Contains(lower, "ssrf"):
+		return "SSRFScanner" // OWASP A10
+	case strings.Contains(lower, "file") || strings.Contains(lower, "include"):
+		return "FileIncludeScanner" // OWASP A03
+	case strings.Contains(lower, "ctf"):
+		return "CTFSolver"
 	case strings.Contains(lower, "code") || strings.Contains(lower, "create"):
 		return "CodeGenerator"
 	case strings.Contains(lower, "test"):

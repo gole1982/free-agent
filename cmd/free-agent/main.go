@@ -249,16 +249,16 @@ func runTask(input string) error {
 	am.RegisterAgent(agent.NewDebuggerAgent(gateway))
 	am.RegisterAgent(agent.NewGitAgent("."))
 	am.RegisterAgent(agent.NewFeedbackAgent(gateway))
-	am.RegisterAgent(agent.NewPentestingAgent(progCfg))
+	am.RegisterAgent(agent.NewSecurityAssessor(progCfg))
 	
-	// 注册新的安全测试细分 Agent
-	am.RegisterAgent(agent.NewSQLiAgent(llmClient))
-	am.RegisterAgent(agent.NewXSSAgent(llmClient))
-	am.RegisterAgent(agent.NewCommandInjectAgent(llmClient))
-	am.RegisterAgent(agent.NewPathTraversalAgent(llmClient))
-	am.RegisterAgent(agent.NewSSRFAgent(llmClient))
-	am.RegisterAgent(agent.NewFileIncludeAgent(llmClient))
-	am.RegisterAgent(agent.NewCTFExploration(llmClient))
+	// 注册安全测试细分Agent（对应OWASP Top 10）
+	am.RegisterAgent(agent.NewSQLInjectionScanner(llmClient))        // OWASP A03
+	am.RegisterAgent(agent.NewXSSScanner(llmClient))                 // OWASP A03
+	am.RegisterAgent(agent.NewCommandInjectionScanner(llmClient))    // OWASP A03
+	am.RegisterAgent(agent.NewPathTraversalScanner(llmClient))       // OWASP A01
+	am.RegisterAgent(agent.NewSSRFScanner(llmClient))                // OWASP A10
+	am.RegisterAgent(agent.NewFileIncludeScanner(llmClient))        // OWASP A03
+	am.RegisterAgent(agent.NewCTFSolver(llmClient))
 	
 	// 注册 Generic Agent (默认路由)
 	am.RegisterAgent(agent.NewGenericAgent(llmClient))
@@ -392,16 +392,16 @@ func runChatMode() error {
 	am.RegisterAgent(agent.NewDebuggerAgent(gateway))
 	am.RegisterAgent(agent.NewGitAgent(sessionDir))
 	am.RegisterAgent(agent.NewFeedbackAgent(gateway))
-	am.RegisterAgent(agent.NewPentestingAgent(progCfg))
+	am.RegisterAgent(agent.NewSecurityAssessor(progCfg))
 	
-	// 注册新的安全测试细分 Agent
-	am.RegisterAgent(agent.NewSQLiAgent(llmClient))
-	am.RegisterAgent(agent.NewXSSAgent(llmClient))
-	am.RegisterAgent(agent.NewCommandInjectAgent(llmClient))
-	am.RegisterAgent(agent.NewPathTraversalAgent(llmClient))
-	am.RegisterAgent(agent.NewSSRFAgent(llmClient))
-	am.RegisterAgent(agent.NewFileIncludeAgent(llmClient))
-	am.RegisterAgent(agent.NewCTFExploration(llmClient))
+	// 注册安全测试细分Agent（对应OWASP Top 10）
+	am.RegisterAgent(agent.NewSQLInjectionScanner(llmClient))        // OWASP A03
+	am.RegisterAgent(agent.NewXSSScanner(llmClient))                 // OWASP A03
+	am.RegisterAgent(agent.NewCommandInjectionScanner(llmClient))    // OWASP A03
+	am.RegisterAgent(agent.NewPathTraversalScanner(llmClient))       // OWASP A01
+	am.RegisterAgent(agent.NewSSRFScanner(llmClient))                // OWASP A10
+	am.RegisterAgent(agent.NewFileIncludeScanner(llmClient))        // OWASP A03
+	am.RegisterAgent(agent.NewCTFSolver(llmClient))
 	
 	// 注册 Generic Agent (默认路由)
 	am.RegisterAgent(agent.NewGenericAgent(llmClient))
@@ -421,9 +421,9 @@ func runChatMode() error {
 	// 从 SKILL.md 加载 Agent 特质
 	agentNames := []string{
 		"Intent", "Coder", "Planner", "Reviewer", "Tester", "Debugger", 
-		"Git", "Feedback", "Pentesting", "SQLiAgent", "XSSAgent",
-		"CommandInjectAgent", "PathTraversalAgent", "SSRFAgent",
-		"FileIncludeAgent", "CTFExploration", "Generic Agent", 
+		"Git", "Feedback", "SecurityAssessor", "SQLInjectionScanner", "XSSScanner",
+		"CommandInjectionScanner", "PathTraversalScanner", "SSRFScanner",
+		"FileIncludeScanner", "CTFSolver", "GeneralHandler", 
 		"Exploration", "Orchestrator",
 	}
 	
@@ -620,19 +620,19 @@ func runUIChat(sessionTitle string) error {
 	am.RegisterAgent(agent.NewDebuggerAgent(gateway))
 	am.RegisterAgent(agent.NewGitAgent(sessionDir))
 	am.RegisterAgent(agent.NewFeedbackAgent(gateway))
-	am.RegisterAgent(agent.NewPentestingAgent(progCfg))
+	am.RegisterAgent(agent.NewSecurityAssessor(progCfg))
 	
 	// 创建LLM Client用于需要它的Agent
 	llmClient := llm.NewClient(progCfg.API.URL, progCfg.API.Key, progCfg.API.BYOK)
 	
-	// 注册新的安全测试细分 Agent
-	am.RegisterAgent(agent.NewSQLiAgent(llmClient))
-	am.RegisterAgent(agent.NewXSSAgent(llmClient))
-	am.RegisterAgent(agent.NewCommandInjectAgent(llmClient))
-	am.RegisterAgent(agent.NewPathTraversalAgent(llmClient))
-	am.RegisterAgent(agent.NewSSRFAgent(llmClient))
-	am.RegisterAgent(agent.NewFileIncludeAgent(llmClient))
-	am.RegisterAgent(agent.NewCTFExploration(llmClient))
+	// 注册安全测试细分Agent（对应OWASP Top 10）
+	am.RegisterAgent(agent.NewSQLInjectionScanner(llmClient))        // OWASP A03
+	am.RegisterAgent(agent.NewXSSScanner(llmClient))                 // OWASP A03
+	am.RegisterAgent(agent.NewCommandInjectionScanner(llmClient))    // OWASP A03
+	am.RegisterAgent(agent.NewPathTraversalScanner(llmClient))       // OWASP A01
+	am.RegisterAgent(agent.NewSSRFScanner(llmClient))                // OWASP A10
+	am.RegisterAgent(agent.NewFileIncludeScanner(llmClient))        // OWASP A03
+	am.RegisterAgent(agent.NewCTFSolver(llmClient))
 	
 	// 注册 Generic Agent (默认路由)
 	am.RegisterAgent(agent.NewGenericAgent(llmClient))
@@ -652,9 +652,9 @@ func runUIChat(sessionTitle string) error {
 	// 从 SKILL.md 加载 Agent 特质
 	agentNames := []string{
 		"Intent", "Coder", "Planner", "Reviewer", "Tester", "Debugger", 
-		"Git", "Feedback", "Pentesting", "SQLiAgent", "XSSAgent",
-		"CommandInjectAgent", "PathTraversalAgent", "SSRFAgent",
-		"FileIncludeAgent", "CTFExploration", "Generic Agent", 
+		"Git", "Feedback", "SecurityAssessor", "SQLInjectionScanner", "XSSScanner",
+		"CommandInjectionScanner", "PathTraversalScanner", "SSRFScanner",
+		"FileIncludeScanner", "CTFSolver", "GeneralHandler", 
 		"Exploration", "Orchestrator",
 	}
 	
