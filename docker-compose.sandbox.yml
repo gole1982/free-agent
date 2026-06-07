@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # 攻击者容器 - Kali Linux
+  attacker:
+    image: kalilinux/kali-rolling
+    container_name: vds-attacker
+    hostname: attacker
+    networks:
+      - attackernet
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - ./tools:/tools:ro
+      - ./reports:/reports
+    environment:
+      - SANDBOX_MODE=true
+      - TZ=Asia/Shanghai
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    restart: unless-stopped
+    command: sleep infinity
+
+  # 靶机容器 - DVWA
+  target-dvwa:
+    image: vulnerables/web-dvwa
+    container_name: vds-target-dvwa
+    hostname: target-dvwa
+    networks:
+      - targetnet
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=100m
+      - /var/tmp:rw,noexec,nosuid,size=50m
+    restart: unless-stopped
+
+  # 靶机容器 - OWASP Juice Shop
+  target-juice-shop:
+    image: bkimminich/juice-shop
+    container_name: vds-target-juice-shop
+    hostname: target-juice-shop
+    networks:
+      - targetnet
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=100m
+    restart: unless-stopped
+
+  # 靶机容器 - WebGoat
+  target-webgoat:
+    image: webgoat/webgoat-8.0
+    container_name: vds-target-webgoat
+    hostname: target-webgoat
+    networks:
+      - targetnet
+    cap_drop:
+      - ALL
+    read_only: true
+    restart: unless-stopped
+
+# 网络配置
+networks:
+  # 攻击者网络 - 可访问有限外网
+  attackernet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.1.0/24
+    driver_opts:
+      com.docker.network.bridge.name: vds-attackernet
+
+  # 靶机网络 - 完全隔离，无外网访问
+  targetnet:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.0.2.0/24
+    driver_opts:
+      com.docker.network.bridge.name: vds-targetnet
+
+# 卷配置
+volumes:
+  tools:
+    driver: local
+  reports:
+    driver: local

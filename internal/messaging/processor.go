@@ -98,14 +98,64 @@ func (p *MessageProcessor) CleanMessage(content string) string {
 	return strings.TrimSpace(content)
 }
 
-// removeAds 移除广告关键词
+// removeAds 移除广告关键词和广告行
 func (p *MessageProcessor) removeAds(content string) string {
+	lines := strings.Split(content, "\n")
+	filtered := []string{}
+	
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		
+		if p.isAdLine(trimmed) {
+			continue
+		}
+		
+		filtered = append(filtered, line)
+	}
+	
+	content = strings.Join(filtered, "\n")
+	
 	for _, ad := range p.adKeywords {
 		content = strings.ReplaceAll(content, ad, "")
 		content = strings.ReplaceAll(content, strings.ToLower(ad), "")
 		content = strings.ReplaceAll(content, strings.Title(ad), "")
 	}
+	
 	return content
+}
+
+// isAdLine 判断是否为广告行
+func (p *MessageProcessor) isAdLine(line string) bool {
+	lowerLine := strings.ToLower(line)
+	adCount := 0
+	
+	for _, ad := range p.adKeywords {
+		if strings.Contains(lowerLine, strings.ToLower(ad)) {
+			adCount++
+		}
+	}
+	
+	if adCount >= 2 {
+		return true
+	}
+	
+	spamPatterns := []string{
+		"chatgpt experience",
+		"native chatgpt",
+		"telegram",
+		"best chatgpt",
+	}
+	
+	for _, pattern := range spamPatterns {
+		if strings.Contains(lowerLine, pattern) {
+			return true
+		}
+	}
+	
+	return false
 }
 
 // removeSeparators 移除分隔符行

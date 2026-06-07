@@ -52,7 +52,7 @@ func (a *XSSScanner) Execute(ctx context.Context, task string) (string, error) {
 	}
 
 	for i, wf := range workflow {
-		fmt.Printf("\n📋 Step %d: %s\n", i+1, wf.step)
+		fmt.Printf("\nStep %d: %s\n", i+1, wf.step)
 		fmt.Printf("   Description: %s\n", wf.desc)
 	}
 

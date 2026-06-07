@@ -23,7 +23,7 @@ Free Agent 是一个多AI代理协作的软件工程系统，具有以下核心�
 | 定时任务调度 | **硬编码** | 固定逻辑，无需智能 |
 | 接收返回状态 | **硬编码** | 系统级机制 |
 | 固定串行计算（Intent解析、Agent选择） | **硬编码** | 确定性流程 |
-| Worker/Watcher/Auditor 启动/停止 | **硬编码** | 生命周期管理 |
+| Executor/Evaluator/Observer 启动/停止 | **硬编码** | 生命周期管理 |
 | 通道管理（信息流转） | **硬编码** | 基础设施 |
 | **意图判断** | **Agent** | 需要 LLM 智能判断 |
 | **死循环检测** | **Agent** | 需要理解上下文 |
@@ -44,30 +44,32 @@ Free Agent 是一个多AI代理协作的软件工程系统，具有以下核心�
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      Scheduler（调度器）                             │
 │  [硬编码] 系统调度、计时器、超时管理、生命周期管理、通道管理         │
+│  委托 TaskCoordinator 进行业务级路由                                │
 └─────────────────────────────────────────────────────────────────────┘
                                 ↓
 ┌─────────────────────────────────────────────────────────────────────┐
-│                  Orchestrator（编排器 Agent）                       │
-│  [Agent] 业务级任务编排、任务分解、多Agent协调、结果汇总             │
+│              TaskCoordinator（任务协调 Agent）                       │
+│  [Agent] 意图分析、任务分解、多Agent协调、结果汇总                   │
+│  IntentAnalyzer 解析意图 → 选择 Executor                            │
 └─────────────────────────────────────────────────────────────────────┘
                                 ↓
         ┌────────────────────────┼────────────────────────┐
         ↓                        ↓                        ↓
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  Worker         │    │  Watcher        │    │  Auditor        │
+│  Executor       │    │  Observer       │    │  Evaluator      │
 │  (执行Agent)    │    │  (控制Agent)    │    │  (管理Agent)    │
 │                 │    │                 │    │                 │
-│ - Intent        │    │ - 意图监控      │    │ - 结果分析      │
-│ - Planner       │    │ - 死循环检测    │    │ - 策略更新      │
-│ - Coder         │    │ - 蜜罐检测      │    │ - 特性调整      │
-│ - Reviewer      │    │ - 恶意检测      │    │ - 结论生成      │
-│ - Tester        │    │ - 主动停止      │    │                 │
-│ - Debugger      │    │ - 汇总信息      │    │                 │
-│ - Git           │    │                 │    │                 │
-│ - Pentesting    │    │                 │    │                 │
-│ - SQLiAgent     │    │                 │    │                 │
-│ - XSSAgent      │    │                 │    │                 │
-│ - ...           │    │                 │    │                 │
+│ - IntentAnalyzer│    │ - 意图监控      │    │ - 结果分析      │
+│ - TaskPlanner   │    │ - 死循环检测    │    │ - 策略更新      │
+│ - CodeGenerator │    │ - 蜜罐检测      │    │ - 特性调整      │
+│ - CodeReviewer  │    │ - 恶意检测      │    │ - 结论生成      │
+│ - TestEngineer  │    │ - 主动停止      │    │                 │
+│ - DebugAnalyst  │    │ - 汇总信息      │    │                 │
+│ - GitOperator   │    │                 │    │                 │
+│ - SecurityAssess│    │                 │    │                 │
+│ - SQLInjection  │    │                 │    │                 │
+│ - XSSScanner    │    │                 │    │                 │
+│ - ...Scanners   │    │                 │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
@@ -78,29 +80,29 @@ Free Agent 是一个多AI代理协作的软件工程系统，具有以下核心�
    ↓
 2. Scheduler（调度器）接收
    ↓
-3. 硬编码：解析 Intent
+3. 硬编码：委托 TaskCoordinator/IntentAnalyzer 解析意图
    ↓
-4. 硬编码：选择 Worker
+4. 硬编码：通过 TaskCoordinator 选择 Executor
    ↓
-5. 启动 Watcher（并行监控）
+5. 启动 Observer（并行监控）
    ↓
-6. Worker 执行任务
+6. Executor 执行任务
    ↓
-7. Worker 输出 → Watcher 接收
+7. Executor 输出 → Observer 接收
    ↓
-8. Watcher 判断：
+8. Observer 判断：
    - 是否遵循意图？
    - 是否死循环？
    - 是否恶意？
    - 是否蜜罐？
    ↓
-9. 如果需要：Watcher 停止 Worker，给出指引
+9. 如果需要：Observer 停止 Executor，给出指引
    ↓
-10. Worker 完成/退出
+10. Executor 完成/退出
     ↓
-11. Watcher 汇总执行信息
+11. Observer 汇总执行信息
     ↓
-12. Auditor 分析：
+12. Evaluator 分析：
     - 退出类型？
     - 任务完成？
     - 需要更新策略？
@@ -119,34 +121,35 @@ Free Agent 是一个多AI代理协作的软件工程系统，具有以下核心�
 
 **职责**：
 - 计时器和超时管理
-- Worker/Watcher/Auditor 的启动和停止
-- 通道管理（Worker→Watcher→Auditor 的信息流转）
+- Executor/Observer/Evaluator 的启动和停止
+- 通道管理（Executor→Observer→Evaluator 的信息流转）
 - 固定串行计算（Intent 解析、Agent 选择）
 
 **核心方法**：
 ```go
 func NewScheduler(llmClient *llm.Client, am *AgentManager, skillLoader *SkillLoader) *Scheduler
 func (s *Scheduler) ExecuteWithAgentPattern(ctx context.Context, task string) (string, error)
+func (s *Scheduler) selectExecutorViaCoordinator(ctx context.Context, task string) (*IntentResult, string, bool)
+func (s *Scheduler) executeMultiAgentWithObserver(ctx context.Context, task string, intentInfo *IntentResult) (string, error)
+func (s *Scheduler) executeSingleWithObserver(ctx context.Context, task string, executorAgentName string) (string, error)
 func (s *Scheduler) SetMaxIterations(max int)
 func (s *Scheduler) SetMaxDuration(duration time.Duration)
-func (s *Scheduler) SetWorkerTimeout(timeout time.Duration)
-func (s *Scheduler) SetWatcherInterval(interval time.Duration)
 ```
 
-### 3.2 Watcher Agent（控制Agent）
+### 3.2 Observer Agent（控制Agent）
 
-**文件**：[watcher_agent.go](file:///d:/Programing/free-agent/internal/agent/watcher_agent.go)
+**文件**：[observer_agent.go](file:///d:/Programing/free-agent/internal/agent/observer_agent.go)
 
-**SKILL 配置**：[watcher.SKILL.md](file:///d:/Programing/free-agent/skills/control/watcher.SKILL.md)
+**SKILL 配置**：[observer.SKILL.md](file:///d:/Programing/free-agent/skills/control/observer.SKILL.md)
 
 **职责**：
-- 实时接收 Worker 执行信息
-- 使用 LLM 判断 Worker 是否遵循用户原始意图
+- 实时接收 Executor 执行信息
+- 使用 LLM 判断 Executor 是否遵循用户原始意图
 - 检测死循环（重复输出、无进展）
 - 检测恶意行为（危险操作）
-- 检测蜜罐触发（"被抓"、"caught"等）
-- 必要时停止 Worker 并提供正确指引
-- Worker 退出后汇总所有执行信息
+- 检测蜜罐触发（“被抓”、“caught”等）
+- 必要时停止 Executor 并提供正确指引
+- Executor 退出后汇总所有执行信息
 
 **核心数据结构**：
 ```go
@@ -171,14 +174,14 @@ type WatcherDecision struct {
 }
 ```
 
-### 3.3 Auditor Agent（管理Agent）
+### 3.3 Evaluator Agent（管理Agent）
 
-**文件**：[auditor_agent.go](file:///d:/Programing/free-agent/internal/agent/auditor_agent.go)
+**文件**：[evaluator_agent.go](file:///d:/Programing/free-agent/internal/agent/evaluator_agent.go)
 
-**SKILL 配置**：[auditor.SKILL.md](file:///d:/Programing/free-agent/skills/management/auditor.SKILL.md)
+**SKILL 配置**：[evaluator.SKILL.md](file:///d:/Programing/free-agent/skills/management/evaluator.SKILL.md)
 
 **职责**：
-- 分析 Watcher 的执行汇总信息
+- 分析 Observer 的执行汇总信息
 - 确定退出类型（正常/异常/恶意/死循环）
 - 决定是否需要更新安全策略
 - 更新输入过滤（恶意指令检测）
@@ -201,39 +204,37 @@ type AuditConclusion struct {
 }
 ```
 
-### 3.4 Orchestrator Agent（编排器）
+### 3.4 TaskCoordinator Agent（任务协调器）
 
-**文件**：[orchestrator_agent.go](file:///d:/Programing/free-agent/internal/agent/orchestrator_agent.go)
+**文件**：[task_coordinator_agent.go](file:///d:/Programing/free-agent/internal/agent/task_coordinator_agent.go)
+
+**SKILL 配置**：[taskcoordinator.SKILL.md](file:///d:/Programing/free-agent/skills/management/taskcoordinator.SKILL.md)
 
 **职责**：
 - 理解复杂任务需求
+- 通过 IntentAnalyzer 分析意图
 - 分解任务为子任务
-- 选择合适的 Agent 执行每个子任务
-- 协调多个 Agent 的工作
+- 选择合适的 Executor 执行每个子任务
+- 协调多个 Executor 的工作
 - 合并结果为最终输出
 
-### 3.5 Worker Agents（执行Agent）
+### 3.5 Executor Agents（执行Agent）
 
-Worker 包括所有业务执行 Agent，如：
+Executor 包括所有业务执行 Agent，如：
 
 | Agent | 职责 | 文件 |
 |-------|------|------|
-| Intent | 意图识别 | [intent_agent.go](file:///d:/Programing/free-agent/internal/agent/intent_agent.go) |
-| Planner | 任务规划 | [planner_agent.go](file:///d:/Programing/free-agent/internal/agent/planner_agent.go) |
-| Coder | 代码编写 | [coder_agent.go](file:///d:/Programing/free-agent/internal/agent/coder_agent.go) |
-| Reviewer | 代码审查 | [reviewer_agent.go](file:///d:/Programing/free-agent/internal/agent/reviewer_agent.go) |
-| Tester | 测试生成 | [tester_agent.go](file:///d:/Programing/free-agent/internal/agent/tester_agent.go) |
-| Debugger | 调试 | [debugger_agent.go](file:///d:/Programing/free-agent/internal/agent/debugger_agent.go) |
-| Git | 版本控制 | [git_agent.go](file:///d:/Programing/free-agent/internal/agent/git_agent.go) |
-| Pentesting | 渗透测试 | [pentesting_agent.go](file:///d:/Programing/free-agent/internal/agent/pentesting_agent.go) |
-| SQLiAgent | SQL注入 | [sqli_agent.go](file:///d:/Programing/free-agent/internal/agent/sqli_agent.go) |
-| XSSAgent | XSS测试 | [xss_agent.go](file:///d:/Programing/free-agent/internal/agent/xss_agent.go) |
-| CommandInjectAgent | 命令注入 | [other_security_agents.go](file:///d:/Programing/free-agent/internal/agent/other_security_agents.go) |
-| PathTraversalAgent | 路径遍历 | [other_security_agents.go](file:///d:/Programing/free-agent/internal/agent/other_security_agents.go) |
-| SSRFAgent | SSRF测试 | [other_security_agents.go](file:///d:/Programing/free-agent/internal/agent/other_security_agents.go) |
-| FileIncludeAgent | 文件包含 | [other_security_agents.go](file:///d:/Programing/free-agent/internal/agent/other_security_agents.go) |
-| CTFExploration | CTF探索 | [other_security_agents.go](file:///d:/Programing/free-agent/internal/agent/other_security_agents.go) |
-| Generic Agent | 通用任务 | [generic_agent.go](file:///d:/Programing/free-agent/internal/agent/generic_agent.go) |
+| IntentAnalyzer | 意图识别 | [intent_analyzer_agent.go](file:///d:/Programing/free-agent/internal/agent/intent_analyzer_agent.go) |
+| TaskPlanner | 任务规划 | [task_planner_agent.go](file:///d:/Programing/free-agent/internal/agent/task_planner_agent.go) |
+| CodeGenerator | 代码编写 | [code_generator_agent.go](file:///d:/Programing/free-agent/internal/agent/code_generator_agent.go) |
+| CodeReviewer | 代码审查 | [code_reviewer_agent.go](file:///d:/Programing/free-agent/internal/agent/code_reviewer_agent.go) |
+| TestEngineer | 测试生成 | [test_engineer_agent.go](file:///d:/Programing/free-agent/internal/agent/test_engineer_agent.go) |
+| DebugAnalyst | 调试 | [debug_analyst_agent.go](file:///d:/Programing/free-agent/internal/agent/debug_analyst_agent.go) |
+| GitOperator | 版本控制 | [git_operator_agent.go](file:///d:/Programing/free-agent/internal/agent/git_operator_agent.go) |
+| SecurityAssessor | 安全评估 | [security_assessor_agent.go](file:///d:/Programing/free-agent/internal/agent/security_assessor_agent.go) |
+| SQLInjectionScanner | SQL注入 | [sql_injection_scanner.go](file:///d:/Programing/free-agent/internal/agent/sql_injection_scanner.go) |
+| XSSScanner | XSS测试 | [xss_scanner.go](file:///d:/Programing/free-agent/internal/agent/xss_scanner.go) |
+| GeneralHandler | 通用任务 | [general_handler_agent.go](file:///d:/Programing/free-agent/internal/agent/general_handler_agent.go) |
 
 ### 3.6 SkillLoader（技能加载器）
 
@@ -248,33 +249,34 @@ Worker 包括所有业务执行 Agent，如：
 ```
 skills/
 ├── coding/
-│   ├── coder.SKILL.md
-│   ├── reviewer.SKILL.md
-│   ├── tester.SKILL.md
-│   └── debugger.SKILL.md
+│   ├── codegenerator.SKILL.md
+│   ├── codereviewer.SKILL.md
+│   ├── testengineer.SKILL.md
+│   └── debuganalyst.SKILL.md
 ├── control/
-│   └── watcher.SKILL.md
+│   └── observer.SKILL.md
 ├── general/
-│   └── generic.SKILL.md
+│   └── generalhandler.SKILL.md
 ├── management/
-│   ├── auditor.SKILL.md
-│   ├── feedback.SKILL.md
-│   ├── intent.SKILL.md
-│   └── orchestrator.SKILL.md
+│   ├── evaluator.SKILL.md
+│   ├── feedbackcollector.SKILL.md
+│   ├── intentanalyzer.SKILL.md
+│   └── taskcoordinator.SKILL.md
 ├── planning/
-│   ├── exploration.SKILL.md
-│   └── planner.SKILL.md
+│   ├── solutionexplorer.SKILL.md
+│   └── taskplanner.SKILL.md
 ├── security/
-│   ├── commandinject.SKILL.md
-│   ├── ctfestoration.SKILL.md
-│   ├── fileinclude.SKILL.md
-│   ├── pathtraversal.SKILL.md
-│   ├── pentesting.SKILL.md
-│   ├── sqli.SKILL.md
-│   ├── ssrf.SKILL.md
-│   └── xss.SKILL.md
+│   ├── securityassessor.SKILL.md
+│   ├── sqlinjectionscanner.SKILL.md
+│   ├── xssscanner.SKILL.md
+│   ├── commandinjectionscanner.SKILL.md
+│   ├── pathtraversalscanner.SKILL.md
+│   ├── ssrfscanner.SKILL.md
+│   ├── fileincludescanner.SKILL.md
+│   ├── ctfsolver.SKILL.md
+│   └── ...其他 OWASP 扫描器
 └── tools/
-    └── git.SKILL.md
+    └── gitoperator.SKILL.md
 ```
 
 ---
@@ -291,37 +293,38 @@ skills/
 **执行流程**：
 
 1. **Scheduler** 接收任务
-2. **Intent** 识别：安全测试 → 选择 `Pentesting` Agent
-3. 启动 `Watcher` 监控
-4. **Pentesting** Agent 执行：
-   - 调用 `SQLiAgent`
-   - 调用 `XSSAgent`
-   - 调用 `PathTraversalAgent`
+2. **IntentAnalyzer** 识别：安全测试 → 选择 `SecurityAssessor` Executor
+3. 启动 `Observer` 监控
+4. **SecurityAssessor** 执行：
+   - 调用 `SQLInjectionScanner`
+   - 调用 `XSSScanner`
+   - 调用 `PathTraversalScanner`
    - ...
-5. **Watcher** 监控每个 Agent：
+5. **Observer** 监控每个 Executor：
    - 如果发现蜜罐，立即停止
    - 如果发现死循环，立即停止
    - 如果偏离目标，给出指引
-6. 所有 Agent 完成后，`Watcher` 汇总
-7. **Auditor** 分析：
+6. 所有 Executor 完成后，`Observer` 汇总
+7. **Evaluator** 分析：
    - 检查是否有安全策略需要更新
    - 调整相关 Agent 特性
 8. 输出最终报告
 
 ---
 
-## 5. 遗留组件（待清理）
+## 5. 历史组件（已清理）
 
-**ClosedLoopManager**（[closed_loop_manager.go](file:///d:/Programing/free-agent/internal/agent/closed_loop_manager.go)）是旧版三层闭环架构的实现，已被新架构替代：
+旧版 `ClosedLoopManager` (ExecutionLayer / ControlLayer / ManagementLayer 三层) 已被 `Scheduler + Executor/Observer/Evaluator` 完全替代并删除：
 
 | 旧组件 | 新组件 |
 |--------|--------|
-| ExecutionLayer | Worker Agents |
-| ControlLayer | Watcher Agent |
-| ManagementLayer | Auditor Agent |
+| ExecutionLayer | Executor Agents |
+| ControlLayer | Observer Agent |
+| ManagementLayer | Evaluator Agent |
 | ClosedLoopManager | Scheduler |
+| Orchestrator Agent | TaskCoordinator Agent |
 
-在确认新架构稳定后，可以移除 ClosedLoopManager。
+未挂载的子系统和已整合的组件已清理。新增 VDS（漏洞挖掘系统）框架、沙箱管理器、工具适配器层。
 
 ---
 
@@ -338,5 +341,9 @@ skills/
 
 | 提交 | 说明 |
 |------|------|
-| `feat: implement Worker/Watcher/Auditor pattern` | 新架构核心实现 |
+| `feat: implement Executor/Observer/Evaluator pattern` | 新架构核心实现 |
 | `feat: complete migration to Scheduler pattern` | 完成架构迁移 |
+| `feat: integrate TaskCoordinator routing` | Scheduler 委托 TaskCoordinator 统一路由 |
+| `feat: add VDS framework` | 漏洞挖掘系统 6 阶段框架 |
+| `feat: sandbox manager with policy engine` | 沙箱管理器 + 策略引擎 + 快照回滚 |
+| `feat: tool adapter layer` | sqlmap/ZAP/Nmap 工具适配器 |

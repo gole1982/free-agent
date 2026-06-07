@@ -1,0 +1,46 @@
+{
+  "command": {
+    "mode": "blacklist",
+    "allowed_commands": [
+      "nmap", "sqlmap", "nikto", "hydra", "curl", "wget",
+      "python3", "python", "node", "bash", "sh", "cat",
+      "grep", "awk", "sed", "find", "ls", "pwd", "whoami",
+      "id", "uname", "ping", "traceroute", "dig", "nslookup",
+      "netcat", "nc", "ssh", "scp", "git"
+    ],
+    "blocked_patterns": [
+      "rm -rf /",
+      "dd if=/dev/zero",
+      ":(){ :|:& };:",
+      "mkfs",
+      "fdisk",
+      "parted",
+      "chmod 777 /",
+      "> /dev/sda",
+      "wget | sh",
+      "curl | sh"
+    ]
+  },
+  "network": {
+    "isolation_mode": "none",
+    "allow_internet": false,
+    "blocked_ports": [22, 3389, 445, 135, 139],
+    "allowed_domains": [
+      "*.exploit-db.com",
+      "*.securityfocus.com",
+      "*.cve.org"
+    ],
+    "rate_limit_mbps": 100
+  },
+  "filesystem": {
+    "readonly": true,
+    "allowed_paths": ["/tools", "/reports", "/workspace", "/tmp"],
+    "blocked_paths": ["/etc/shadow", "/etc/passwd", "/root/.ssh", "/boot", "/proc", "/sys"],
+    "max_disk_usage": "10g"
+  },
+  "alert": {
+    "enabled": true,
+    "channels": ["log"],
+    "severity_threshold": "medium"
+  }
+}

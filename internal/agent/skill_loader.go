@@ -57,18 +57,21 @@ func (sl *SkillLoader) LoadSkill(agentName string) (*SkillConfig, error) {
 
 // findSkillFile 在 skills 目录中找到对应的 SKILL.md 文件
 func (sl *SkillLoader) findSkillFile(agentName string) (string, error) {
-	match, err := filepath.Glob(filepath.Join(sl.skillsDir, "**", "*.SKILL.md"))
+	upper, err := filepath.Glob(filepath.Join(sl.skillsDir, "**", "*.SKILL.md"))
 	if err != nil {
 		return "", err
 	}
+	lower, _ := filepath.Glob(filepath.Join(sl.skillsDir, "**", "*.skill.md"))
+	match := append(upper, lower...)
+
+	target := strings.ToLower(agentName)
+	targetCompact := strings.ToLower(strings.ReplaceAll(agentName, " ", ""))
 
 	for _, f := range match {
 		base := filepath.Base(f)
-		namePart := strings.TrimSuffix(base, ".SKILL.md")
-		namePart = strings.ToLower(namePart)
-		if namePart == strings.ToLower(agentName) ||
-			namePart == strings.ToLower(strings.Replace(agentName, " ", "", -1)) ||
-			strings.Contains(strings.ToLower(base), strings.ToLower(agentName)) {
+		namePart := strings.ToLower(strings.TrimSuffix(strings.TrimSuffix(base, ".SKILL.md"), ".skill.md"))
+		if namePart == target || namePart == targetCompact ||
+			strings.Contains(strings.ToLower(base), target) {
 			return f, nil
 		}
 	}

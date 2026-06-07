@@ -62,7 +62,7 @@ func getDefaultActions() []Action {
 
 func (env *TestEnvironment) RunEpisode() (string, error) {
 	env.EpisodeCount++
-	fmt.Printf("\n" + strings.Repeat("🎬", 20))
+	fmt.Println("\n" + strings.Repeat("🎬", 20))
 	fmt.Printf("\n🎬 STARTING EPISODE %d\n", env.EpisodeCount)
 	fmt.Println(strings.Repeat("🎬", 20) + "\n")
 

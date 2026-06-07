@@ -20,31 +20,31 @@
 
 ## Agent 分类体系
 
-### 第一层级：大分类（原有的分类保持不变
+### 第一层级：大分类（已对齐代码命名）
 | Agent | 职责 |
 |---------|------|
-| **Coder** | 代码编写 |
-| **Planner** | 任务规划 |
-| **Reviewer** | 代码审查 |
-| **Tester** | 测试编写 |
-| **Debugger** | 调试分析 |
-| **Git** | Git操作 |
-| **Feedback** | 结果评估 |
+| **CodeGenerator** | 代码编写 |
+| **TaskPlanner** | 任务规划 |
+| **CodeReviewer** | 代码审查 |
+| **TestEngineer** | 测试编写 |
+| **DebugAnalyst** | 调试分析 |
+| **GitOperator** | Git操作 |
+| **FeedbackCollector** | 结果评估 |
 
 ### 安全测试类 Agent 进一步细分（新增）
 
 #### 第二层级：安全测试细分 Agent
 | Agent | 适用场景 | 特点 |
 |-------|---------|------|
-| **SQLiAgent** | SQL注入测试 | 有明确范式：测试点、注入点识别 → 构造payload → 验证 → 利用 |
-| **XSSAgent** | XSS测试 | 有明确范式：输入点识别 → 构造payload → 验证 → 利用 |
-| **CommandInjectAgent** | 命令注入 | 有明确范式 |
-| **PathTraversalAgent** | 路径遍历 | 有明确范式 |
-| **SSRFAttacker** | SSRF攻击 | 有明确范式 |
-| **FileIncludeAgent** | 文件包含 | 有明确范式 |
-| **CTFExploration** | 通用CTF探索 | 不确定，可能需要多个Agent协作 |
-| **Pentesting** | 综合渗透测试 | 综合型 |
-| **Generic** | 默认路由 | 其他所有不确定的情况 |
+| **SQLInjectionScanner** | SQL注入测试 | 有明确范式：测试点、注入点识别 → 构造 payload → 验证 → 利用 |
+| **XSSScanner** | XSS测试 | 有明确范式：输入点识别 → 构造 payload → 验证 → 利用 |
+| **CommandInjectionScanner** | 命令注入 | 有明确范式 |
+| **PathTraversalScanner** | 路径遍历 | 有明确范式 |
+| **SSRFScanner** | SSRF攻击 | 有明确范式 |
+| **FileIncludeScanner** | 文件包含 | 有明确范式 |
+| **CTFSolver** | 通用CTF探索 | 不确定，可能需要多个Agent协作 |
+| **SecurityAssessor** | 综合渗透测试 | 综合型，编排多个 Scanner |
+| **GeneralHandler** | 默认路由 | 其他所有不确定的情况 |
 
 ---
 
@@ -53,21 +53,21 @@
 ```
 用户输入
     ↓
-IntentAgent (意图识别)
+IntentAnalyzer (意图识别)
     ↓
 ┌─────────────────────────────────────────────────────────┐
 │  路由决策表                                         │
 ├─────────────────────────────────────────────────────────┤
-│  条件                          → 目标 Agent          │
+│  条件                          → 目标 Executor          │
 ├─────────────────────────────────────────────────────────┤
-│  明确是代码任务             → Coder/Planner等       │
-│  明确提到"SQL注入"            → SQLiAgent              │
-│  明确提到"XSS"               → XSSAgent             │
-│  明确提到"命令注入"          → CommandInjectAgent    │
-│  明确提到"DVWA SQL注入"       → SQLiAgent              │
-│  提到"CTF"但不确定具体类型    → CTFExploration      │
-│  提到"渗透测试"                → Pentesting           │
-│  不确定/低置信度              → GenericAgent          │
+│  明确是代码任务             → CodeGenerator/TaskPlanner等 │
+│  明确提到“SQL注入”            → SQLInjectionScanner      │
+│  明确提到“XSS”               → XSSScanner              │
+│  明确提到“命令注入”          → CommandInjectionScanner │
+│  明确提到“DVWA SQL注入”       → SQLInjectionScanner      │
+│  提到“CTF”但不确定具体类型    → CTFSolver               │
+│  提到“渗透测试”                → SecurityAssessor        │
+│  不确定/低置信度              → GeneralHandler          │
 └─────────────────────────────────────────────────────────┘
     ↓
 相应 Agent 执行
@@ -79,7 +79,7 @@ IntentAgent (意图识别)
 
 ## Agent 判断条件
 
-### SQLiAgent 判断条件
+### SQLInjectionScanner 判断条件
 - 关键词: "sql注入", "sql injection", "sqli", "union select", "' or 1=1"
 - 明确的流程:
   1. 识别输入点
@@ -88,7 +88,7 @@ IntentAgent (意图识别)
   4. 验证
   5. 利用 (如果可能)
 
-### XSSAgent 判断条件
+### XSSScanner 判断条件
 - 关键词: "xss", "cross site", "cross-site", "<script>", "javascript:"
 - 明确的流程:
   1. 识别输入点
@@ -97,9 +97,9 @@ IntentAgent (意图识别)
   4. 验证
   5. 利用
 
-### CommandInjectAgent 判断条件
+### CommandInjectionScanner 判断条件
 - 关键词: "命令注入", "command injection", "rce", "remote code", "; ls", "; dir"
 
-### GenericAgent 判断条件 (默认路由)
+### GeneralHandler 判断条件 (默认路由)
 - 所有其他不确定的情况
 - 置信度 < 0.6 的情况

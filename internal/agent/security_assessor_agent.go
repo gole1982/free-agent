@@ -3,158 +3,181 @@ package agent
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
+	"time"
 
-	"github.com/vibe-coding/free-agent/pkg/config"
+	"github.com/vibe-coding/free-agent/internal/llm"
 )
 
-// SecurityAssessor 安全评估Agent
-// 负责协调安全测试，执行OWASP Top 10漏洞扫描
-type SecurityAssessor struct {
-	securityEnabled bool
-	findings        []SecurityFinding
+type SecurityAssessorAgent struct {
+	agentMgr  *AgentManager
+	llmClient *llm.Client
 }
 
-// SecurityFinding 安全发现结构
-type SecurityFinding struct {
-	ID          string
-	Type        string // OWASP分类：A01-A10
-	Severity    string // CRITICAL/HIGH/MEDIUM/LOW
-	Description string
-	Payload     string
-	OWASPID     string
-	Timestamp   string
+type scannerEntry struct {
+	Name     string
+	OWASPCat string
 }
 
-// NewSecurityAssessor 创建SecurityAssessor Agent
-func NewSecurityAssessor(progCfg *config.ProgramConfig) *SecurityAssessor {
-	return &SecurityAssessor{
-		securityEnabled: progCfg.Pentesting.Enabled,
-		findings:        []SecurityFinding{},
-	}
+type scannerResult struct {
+	Entry    scannerEntry
+	Output   string
+	Err      error
+	Skipped  bool
+	SkipNote string
 }
 
-// Name 实现Agent接口
-func (a *SecurityAssessor) Name() string {
+var defaultScannerRoster = []scannerEntry{
+	{"SQLInjectionScanner", "A03"},
+	{"XSSScanner", "A03"},
+	{"CommandInjectionScanner", "A03"},
+	{"FileIncludeScanner", "A03"},
+	{"PathTraversalScanner", "A01"},
+	{"SSRFScanner", "A10"},
+	{"CryptographicFailuresScanner", "A02"},
+	{"InsecureDesignScanner", "A04"},
+	{"SecurityMisconfigurationScanner", "A05"},
+	{"VulnerableComponentsScanner", "A06"},
+	{"AuthenticationFailuresScanner", "A07"},
+	{"SoftwareIntegrityScanner", "A08"},
+	{"LoggingFailuresScanner", "A09"},
+}
+
+func NewSecurityAssessorAgent(am *AgentManager, llmClient *llm.Client) *SecurityAssessorAgent {
+	return &SecurityAssessorAgent{agentMgr: am, llmClient: llmClient}
+}
+
+func (a *SecurityAssessorAgent) Name() string {
 	return "SecurityAssessor"
 }
 
-// Description 实现Agent接口
-func (a *SecurityAssessor) Description() string {
-	return "Security Assessor - OWASP Top 10 vulnerability scanning and security assessment"
+func (a *SecurityAssessorAgent) Description() string {
+	return "OWASP Top 10 security testing coordinator - delegates to specialized scanners and aggregates findings"
 }
 
-// Execute SecurityAssessor的主执行逻辑（Agent接口）
-func (a *SecurityAssessor) Execute(ctx context.Context, input string) (string, error) {
-	if !a.securityEnabled {
-		return "Security assessment mode is not enabled. Set PENTESTING_ENABLED=true in .env to enable.", nil
+func (a *SecurityAssessorAgent) Execute(ctx context.Context, task string) (string, error) {
+	target := extractSecurityTarget(task)
+	if target == "" {
+		return "", fmt.Errorf("unable to extract target URL from task: %s", task)
 	}
 
-	// 检查输入是否包含URL（用于实际扫描）
-	if strings.Contains(input, "http://") || strings.Contains(input, "https://") || strings.Contains(input, "localhost") {
-		return a.executeSecurityScan(ctx, input)
-	}
-
-	// 否则使用简单响应
-	return "SecurityAssessor ready! Provide a target URL to scan.", nil
+	fmt.Printf("[SecurityAssessor] Starting security assessment for: %s\n", target)
+	results := a.runScanners(ctx, target, defaultScannerRoster, nil)
+	return formatAssessmentReport(target, defaultScannerRoster, results), nil
 }
 
-// executeSecurityScan 执行安全扫描
-func (a *SecurityAssessor) executeSecurityScan(ctx context.Context, input string) (string, error) {
-	// 从输入中提取URL
-	targetURL := extractSecurityTargetURL(input)
-	if targetURL == "" {
-		targetURL = "http://localhost"
+// RunWithObserver executes security assessment with per-scanner Observer monitoring.
+// The Observer receives ExecutorExecutionInfo for each scanner and can stop execution early.
+func (a *SecurityAssessorAgent) RunWithObserver(ctx context.Context, task string, observer *ObserverAgent) (string, error) {
+	target := extractSecurityTarget(task)
+	if target == "" {
+		return "", fmt.Errorf("unable to extract target URL from task: %s", task)
 	}
 
-	fmt.Printf("[SecurityAssessor] Starting security scan on: %s\n", targetURL)
-	
-	// 使用简单扫描器
-	report, err := SimpleDVWAScan(targetURL)
-	return report, err
+	fmt.Printf("[SecurityAssessor] Starting observed security assessment for: %s\n", target)
+	results := a.runScanners(ctx, target, defaultScannerRoster, observer)
+	return formatAssessmentReport(target, defaultScannerRoster, results), nil
 }
 
-// extractSecurityTargetURL 从输入中提取目标URL
-func extractSecurityTargetURL(input string) string {
-	words := strings.Fields(input)
-	for _, word := range words {
-		if strings.HasPrefix(word, "http://") || strings.HasPrefix(word, "https://") {
-			return word
+func (a *SecurityAssessorAgent) runScanners(ctx context.Context, target string, roster []scannerEntry, observer *ObserverAgent) []scannerResult {
+	results := make([]scannerResult, 0, len(roster))
+	for _, entry := range roster {
+		// Check if Observer wants to stop
+		if observer != nil {
+			select {
+			case <-ctx.Done():
+				fmt.Println("[SecurityAssessor] Context cancelled, stopping scanners")
+				return results
+			default:
+			}
 		}
-		if strings.HasPrefix(word, "localhost") {
-			return "http://" + word
+
+		sc, err := a.agentMgr.GetAgent(entry.Name)
+		if err != nil {
+			results = append(results, scannerResult{Entry: entry, Skipped: true, SkipNote: "not registered"})
+			fmt.Printf("  [skip] %s not registered\n", entry.Name)
+			continue
+		}
+		out, runErr := sc.Execute(ctx, fmt.Sprintf("Assess %s for %s", entry.Name, target))
+		results = append(results, scannerResult{Entry: entry, Output: out, Err: runErr})
+
+		// Report per-scanner info to Observer
+		if observer != nil {
+			flag := "normal"
+			if runErr != nil {
+				flag = "error"
+			}
+			info := ExecutorExecutionInfo{
+				AgentName:     entry.Name,
+				Task:          fmt.Sprintf("Assess %s for %s", entry.Name, target),
+				Output:        truncate(out, 300),
+				ExecutionFlag: flag,
+				Timestamp:     time.Now(),
+			}
+			observer.ReceiveExecutorInfo(info)
+
+			// Brief pause to allow Observer to process
+			time.Sleep(50 * time.Millisecond)
+			decision := observer.GetDecision()
+			if decision.ShouldStop {
+				fmt.Printf("[SecurityAssessor] Observer stopped assessment: %s\n", decision.Reason)
+				return results
+			}
+		}
+	}
+	return results
+}
+
+func formatAssessmentReport(target string, roster []scannerEntry, results []scannerResult) string {
+	cats := summarizeCategories(roster)
+	var b strings.Builder
+	fmt.Fprintf(&b, "===== Security Assessment Report =====\n\n")
+	fmt.Fprintf(&b, "Target: %s\n", target)
+	fmt.Fprintf(&b, "OWASP Coverage: %s\n", cats)
+	fmt.Fprintf(&b, "Scanners Run: %d\n\n", len(results))
+
+	for _, r := range results {
+		fmt.Fprintf(&b, "\n--- %s [%s] ---\n", r.Entry.Name, r.Entry.OWASPCat)
+		if r.Skipped {
+			fmt.Fprintf(&b, "[skipped] %s\n", r.SkipNote)
+			continue
+		}
+		if r.Err != nil {
+			fmt.Fprintf(&b, "Error: %v\n", r.Err)
+			continue
+		}
+		b.WriteString(r.Output)
+		if !strings.HasSuffix(r.Output, "\n") {
+			b.WriteString("\n")
+		}
+	}
+
+	b.WriteString("\n===== End of Report =====\n")
+	return b.String()
+}
+
+func summarizeCategories(roster []scannerEntry) string {
+	seen := make(map[string]bool, 8)
+	parts := make([]string, 0, 8)
+	for _, r := range roster {
+		if seen[r.OWASPCat] {
+			continue
+		}
+		seen[r.OWASPCat] = true
+		parts = append(parts, r.OWASPCat)
+	}
+	return strings.Join(parts, ", ")
+}
+
+func extractSecurityTarget(task string) string {
+	for _, prefix := range []string{"http://", "https://"} {
+		if idx := strings.Index(task, prefix); idx >= 0 {
+			rest := task[idx+len(prefix):]
+			if end := strings.IndexAny(rest, " \t\n"); end >= 0 {
+				return task[idx : idx+len(prefix)+end]
+			}
+			return task[idx:]
 		}
 	}
 	return ""
-}
-
-// analyzeInput 分析输入中的安全漏洞
-func (a *SecurityAssessor) analyzeInput(input string) []SecurityFinding {
-	var findings []SecurityFinding
-
-	// OWASP Top 10 (2021) 漏洞模式
-	payloadPatterns := []struct {
-		name     string
-		pattern  *regexp.Regexp
-		severity string
-		owaspID  string
-	}{
-		// A01: Broken Access Control
-		{"Path Traversal", regexp.MustCompile(`\.\./`), "HIGH", "A01"},
-		
-		// A03: Injection
-		{"SQL Injection", regexp.MustCompile(`('|")?OR\s+\d+=\d+`), "CRITICAL", "A03"},
-		{"SQL Injection", regexp.MustCompile(`UNION\s+SELECT`), "CRITICAL", "A03"},
-		{"XSS", regexp.MustCompile(`<script[^>]*>.*?</script>`), "HIGH", "A03"},
-		{"XSS", regexp.MustCompile(`javascript:`), "HIGH", "A03"},
-		{"Command Injection", regexp.MustCompile(`(;|\|\||&&)\s*(rm|ls|dir|cat)`), "CRITICAL", "A03"},
-		{"File Include", regexp.MustCompile(`etc/passwd|windows/system32`), "CRITICAL", "A03"},
-		
-		// A10: Server-Side Request Forgery
-		{"SSRF", regexp.MustCompile(`http://127\.0\.0\.1|http://localhost`), "HIGH", "A10"},
-		
-		// Other
-		{"XXE", regexp.MustCompile(`<!DOCTYPE|<!ENTITY`), "CRITICAL", "A03"},
-		{"CSRF", regexp.MustCompile(`csrf|token`), "MEDIUM", "A01"},
-		{"RCE", regexp.MustCompile(`system\(|exec\(|shell_exec`), "CRITICAL", "A03"},
-		{"Deserialization", regexp.MustCompile(`pickle|serialize|unserialize`), "CRITICAL", "A03"},
-	}
-
-	for _, pp := range payloadPatterns {
-		if pp.pattern.MatchString(strings.ToLower(input)) {
-			matches := pp.pattern.FindString(input)
-			findings = append(findings, SecurityFinding{
-				ID:          fmt.Sprintf("SA%03d", len(findings)+1),
-				Type:        pp.name,
-				Severity:    pp.severity,
-				Description: fmt.Sprintf("Detected potential %s vulnerability (OWASP %s)", pp.name, pp.owaspID),
-				Payload:     matches,
-				OWASPID:     pp.owaspID,
-				Timestamp:   "Now",
-			})
-		}
-	}
-
-	return findings
-}
-
-// GetFindings 获取安全发现
-func (a *SecurityAssessor) GetFindings() []SecurityFinding {
-	return a.findings
-}
-
-// ClearFindings 清除安全发现
-func (a *SecurityAssessor) ClearFindings() {
-	a.findings = []SecurityFinding{}
-}
-
-// IsEnabled 检查是否启用
-func (a *SecurityAssessor) IsEnabled() bool {
-	return a.securityEnabled
-}
-
-// SetEnabled 设置启用状态
-func (a *SecurityAssessor) SetEnabled(enabled bool) {
-	a.securityEnabled = enabled
 }

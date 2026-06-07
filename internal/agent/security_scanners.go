@@ -151,7 +151,7 @@ func (a *SSRFScanner) Description() string {
 
 // Execute 执行SSRF测试
 func (a *SSRFScanner) Execute(ctx context.Context, task string) (string, error) {
-	fmt.Printf("\n🌐 [SSRFScanner] Starting SSRF Scan: %s\n", task)
+	fmt.Printf("\n[SSRFScanner] Starting SSRF Scan: %s\n", task)
 	fmt.Println(strings.Repeat("=", 80))
 	fmt.Println("OWASP Category: A10:2021 - Server-Side Request Forgery")
 	

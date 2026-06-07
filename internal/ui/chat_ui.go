@@ -399,25 +399,48 @@ func (m *ChatModel) View() string {
 	thinkingInfo := ""
 	if m.isThinking {
 		thinkingTime := time.Since(m.thinkingStart).Seconds()
-		thinkingInfo = fmt.Sprintf(" | Thinking: %.1fs", thinkingTime)
+		thinkingInfo = fmt.Sprintf("Thinking: %.1fs", thinkingTime)
 	}
 
 	roundInfo := fmt.Sprintf("Round: %d", len(m.allRounds))
 	charsInfo := fmt.Sprintf("Chars: %d/%d", m.charCount, m.charCountTotal)
 	
-	systemBar := systemStyle.Render(fmt.Sprintf("LLM: %s | Agent: %s | Context: %s | %s | %s%s | %s",
-		m.llmName, m.currentAgent, m.contextInfo, roundInfo, charsInfo, thinkingInfo, m.systemStatus))
+	statusLine := fmt.Sprintf("[LLM: %s] [Agent: %s] [Context: %s] | %s | %s",
+		m.llmName, m.currentAgent, m.contextInfo, roundInfo, charsInfo)
+	
+	if thinkingInfo != "" {
+		statusLine += fmt.Sprintf(" | %s", thinkingInfo)
+	}
+	
+	statusLine += fmt.Sprintf(" | %s", m.systemStatus)
+
+	systemBar := systemStyle.Render(statusLine)
 
 	listView := borderStyle.Render(m.conversationList.View())
+	
+	viewportContent := borderStyle.Render(m.viewport.View())
+	
+	inputArea := lipgloss.NewStyle().
+		Width(m.width-m.listWidth-4).
+		BorderTop(true).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("#4B5563")).
+		Render(m.textarea.View())
+	
 	contentView := lipgloss.JoinVertical(lipgloss.Left,
-		borderStyle.Render(m.viewport.View()),
-		lipgloss.NewStyle().Width(m.width-m.listWidth-4).Render(m.textarea.View()),
+		viewportContent,
+		inputArea,
 	)
 
 	mainContent := lipgloss.JoinHorizontal(lipgloss.Top, listView, contentView)
 
+	separator := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#374151")).
+		Render(strings.Repeat("-", m.width))
+
 	return lipgloss.JoinVertical(lipgloss.Left,
 		mainContent,
+		separator,
 		systemBar,
 	)
 }
@@ -449,6 +472,10 @@ func (m *ChatModel) SetCurrentAgent(agent string) {
 
 func (m *ChatModel) SetLLMName(name string) {
 	m.llmName = name
+}
+
+func (m *ChatModel) SetProjectName(name string) {
+	m.projectName = name
 }
 
 func min(a, b int) int {

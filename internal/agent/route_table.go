@@ -110,7 +110,7 @@ func (rt *RoutingTable) SelectAgent(task string) (string, error) {
 	rt.mu.RLock()
 	defer rt.mu.RUnlock()
 
-	fmt.Printf("\n🔍 [Routing Table] 查找路由: %s\n", task)
+	fmt.Printf("\n🔍 [Routing Table] Looking up route: %s\n", task)
 
 	// 找出所有匹配的路由
 	var matchingRoutes []*AgentRoute
@@ -134,7 +134,7 @@ func (rt *RoutingTable) SelectAgent(task string) (string, error) {
 	sortByPrefixLength(matchingRoutes)
 
 	if len(matchingRoutes) > 0 {
-		fmt.Printf("  ✓ 找到 %d 条匹配路由\n", len(matchingRoutes))
+		fmt.Printf("  ✓  Found %d matching routes\n", len(matchingRoutes))
 		
 		// 在匹配的路由中选择度量最好的
 		bestRoute := matchingRoutes[0]
@@ -146,7 +146,7 @@ func (rt *RoutingTable) SelectAgent(task string) (string, error) {
 			}
 		}
 
-		fmt.Printf("  ✨ 最佳路由: %s → Agent: %s (成功率: %.1f%%, 度量: %.2f)\n", 
+		fmt.Printf("  ✨  Best route: %s → Agent: %s (success rate: %.1f%%, metric: %.2f)\n",
 			bestRoute.Pattern, bestRoute.AgentName, bestRoute.SuccessRate*100, bestRoute.Metric)
 		
 		return bestRoute.AgentName, nil
@@ -154,7 +154,7 @@ func (rt *RoutingTable) SelectAgent(task string) (string, error) {
 
 	// 没有匹配的，使用默认路由
 	if rt.defaultRoute != nil && rt.defaultRoute.Status == RouteUp {
-		fmt.Printf("  ➡️ 使用默认路由 → Agent: %s\n", rt.defaultRoute.AgentName)
+		fmt.Printf("  ➡️  Using default route → Agent: %s\n", rt.defaultRoute.AgentName)
 		return rt.defaultRoute.AgentName, nil
 	}
 
@@ -220,7 +220,7 @@ func (rt *RoutingTable) RecordRouteResult(pattern string, agentName string, succ
 
 	// 检查是否需要标记为down（连续失败）
 	if health.ConsecutiveFails >= 3 {
-		fmt.Printf("⚠️  Agent %s 连续失败 %d 次，标记为失效\n", agentName, health.ConsecutiveFails)
+		fmt.Printf("⚠️  Agent %s has %d consecutive failures, marking as down\n", agentName, health.ConsecutiveFails)
 		health.CurrentStatus = RouteDown
 		targetRoute.Status = RouteDown
 	}
@@ -229,7 +229,7 @@ func (rt *RoutingTable) RecordRouteResult(pattern string, agentName string, succ
 	// 考虑: 成功率、执行时间、最近使用
 	targetRoute.Metric = calculateMetric(targetRoute)
 
-	fmt.Printf("📊 路由更新: %s/%d → %s [成功:%d, 失败:%d, 成功率:%.1f%%, 度量:%.2f]\n",
+	fmt.Printf("📊  Route update: %s/%d → %s [success:%d, failure:%d, rate:%.1f%%, metric:%.2f]\n",
 		targetRoute.Pattern, targetRoute.PrefixLength, targetRoute.AgentName,
 		targetRoute.SuccessCount, targetRoute.FailureCount, targetRoute.SuccessRate*100, targetRoute.Metric)
 
@@ -251,7 +251,7 @@ func (rt *RoutingTable) RecoverAgent(agentName string) {
 				route.Status = RouteUp
 			}
 		}
-		fmt.Printf("✅ Agent %s 已恢复\n", agentName)
+		fmt.Printf("✅ Agent %s recovered\n", agentName)
 	}
 }
 

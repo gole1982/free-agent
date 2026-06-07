@@ -12,7 +12,7 @@ A harness-style multi-AI agent system for software engineering.
 - 🔄 Multi-turn conversation support
 - 📊 Real-time system status monitoring
 - 🔒 Separate program and project configurations
-- 🔄 **Worker/Watcher/Auditor Architecture** - Clear separation between hardcoded scheduling and agent intelligence
+- 🔄 **Executor/Observer/Evaluator Architecture** - Clear separation between hardcoded scheduling and agent intelligence
 - 📝 **Skill-Driven Configuration** - Agent behaviors defined in SKILL.md files
 - ⚙️ **Self-Learning System** - Agents optimize traits based on execution feedback
 
@@ -24,22 +24,23 @@ Free Agent uses a clear boundary between hardcoded system functions and agent-dr
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      Scheduler (Hardcoded)                           │
 │  System scheduling, timing, lifecycle management, channel management │
+│  Delegates to TaskCoordinator for business routing                   │
 └─────────────────────────────────────────────────────────────────────┘
                                 ↓
 ┌─────────────────────────────────────────────────────────────────────┐
-│                  Orchestrator (Agent)                               │
-│  Business-level task coordination, task decomposition               │
+│              TaskCoordinator (Agent)                                 │
+│  Intent analysis, task decomposition, multi-agent coordination      │
 └─────────────────────────────────────────────────────────────────────┘
                                 ↓
         ┌────────────────────────┼────────────────────────┐
         ↓                        ↓                        ↓
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  Workers        │    │  Watcher        │    │  Auditor        │
+│  Executors      │    │  Observer       │    │  Evaluator      │
 │  (Agents)       │    │  (Agent)        │    │  (Agent)        │
-│ - Intent        │    │ - Intent check  │    │ - Result review │
-│ - Planner       │    │ - Deadloop det  │    │ - Policy update │
-│ - Coder         │    │ - Honeypot det  │    │ - Trait adjust  │
-│ - Pentesting    │    │ - Malicious det │    │                 │
+│ - IntentAnalyzer│    │ - Intent check  │    │ - Result review │
+│ - TaskPlanner   │    │ - Deadloop det  │    │ - Policy update │
+│ - CodeGenerator │    │ - Honeypot det  │    │ - Trait adjust  │
+│ - SecurityAssess│    │ - Malicious det │    │                 │
 │ - SQLi/XSS/...  │    │ - Stop & guide  │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
@@ -164,28 +165,37 @@ Automatically generated in project directory when creating sessions:
 free-agent/
 ├── .env                      # Program configuration
 ├── DESIGN.md                  # Complete system design and requirements
-├── README.md                # This file
+├── README.md                  # This file
+├── AGENT_NAMING.md            # Agent naming conventions
 ├── .github/workflows/ci-cd.yml  # CI/CD pipeline
 ├── cmd/free-agent/main.go     # Main entry point
 ├── internal/
-│   ├── agent/                # AI agents
-│   │   ├── scheduler.go       # Scheduler (hardcoded)
-│   │   ├── watcher_agent.go # Watcher (control agent)
-│   │   ├── auditor_agent.go # Auditor (management agent)
-│   │   ├── skill_loader.go  # SKILL.md parser
-│   │   └── ...            # Other worker agents
-│   ├── llm/                  # LLM client
-│   ├── logger/               # Logging system
-│   ├── memory/               # Conversation storage
-│   └── ui/                   # Terminal UI
-├── skills/                   # Agent skill configurations
-│   ├── coding/             # Coding agents
-│   ├── control/            # Control agents
-│   ├── management/         # Management agents
-│   ├── security/            # Security testing agents
-│   └── ...
-├── pkg/config/               # Configuration management
-└── projects/                 # Project sessions directory
+│   ├── agent/                 # AI agents
+│   │   ├── scheduler.go       # Scheduler (hardcoded orchestration)
+│   │   ├── task_coordinator_agent.go  # TaskCoordinator (business routing)
+│   │   ├── observer_agent.go  # Observer (control agent)
+│   │   ├── evaluator_agent.go # Evaluator (management agent)
+│   │   ├── skill_loader.go    # SKILL.md parser
+│   │   └── *_agent.go         # Executor agents (CodeGenerator, IntentAnalyzer, etc.)
+│   ├── llm/                   # LLM client
+│   ├── logger/                # Logging system
+│   ├── memory/                # Conversation storage (SQLite)
+│   ├── messaging/             # Message cleaning
+│   ├── sandbox/               # Sandbox manager, policy engine, audit, snapshots
+│   ├── tools/                 # Tool system
+│   ├── vds/                   # Vulnerability Discovery System (6-phase framework)
+│   │   └── tools/             # Tool adapters (sqlmap, ZAP, Nmap)
+│   └── ui/                    # Terminal UI (Bubbletea)
+├── skills/                    # Agent SKILL.md files
+│   ├── coding/                # CodeGenerator, CodeReviewer, TestEngineer, DebugAnalyst
+│   ├── control/               # Observer
+│   ├── management/            # Evaluator, IntentAnalyzer, TaskCoordinator, FeedbackCollector
+│   ├── planning/              # TaskPlanner, SolutionExplorer
+│   ├── security/              # SecurityAssessor + OWASP scanners
+│   ├── tools/                 # GitOperator
+│   └── general/               # GeneralHandler
+├── pkg/config/                # Configuration management
+└── projects/                  # Project sessions directory
 ```
 
 ## CI/CD

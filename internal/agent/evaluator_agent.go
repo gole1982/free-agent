@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/vibe-coding/free-agent/internal/llm"
+	"github.com/vibe-coding/free-agent/internal/memory"
 )
 
 // EvaluationConclusion Evaluator的分析结论
@@ -26,14 +27,16 @@ type EvaluatorAgent struct {
 	name        string
 	llmClient   *llm.Client
 	skillLoader *SkillLoader
+	store       *memory.Store
 }
 
 // NewEvaluatorAgent 创建Evaluator Agent
-func NewEvaluatorAgent(llmClient *llm.Client, skillLoader *SkillLoader) *EvaluatorAgent {
+func NewEvaluatorAgent(llmClient *llm.Client, skillLoader *SkillLoader, store *memory.Store) *EvaluatorAgent {
 	return &EvaluatorAgent{
 		name:        "Evaluator",
 		llmClient:   llmClient,
 		skillLoader: skillLoader,
+		store:       store,
 	}
 }
 
@@ -42,240 +45,240 @@ func (e *EvaluatorAgent) Name() string {
 	return e.name
 }
 
-// Description 实现Agent接口
+// Description implements Agent interface
 func (e *EvaluatorAgent) Description() string {
-	return "管理Agent - 分析执行信息，得出结论并更新安全策略（Evaluator模式）"
+	return "Management Agent - Analyzes execution information, draws conclusions, and updates security policies (Evaluator pattern)"
 }
 
-// Execute Evaluator的主执行逻辑（Agent接口）
+// Execute implements Agent interface - Evaluator main execution logic
 func (e *EvaluatorAgent) Execute(ctx context.Context, task string) (string, error) {
-	// Evaluator接收Observer的汇总信息进行分析
-	// task参数包含Observer的汇总信息
+	// Evaluator receives summary from Observer for analysis
+	// task parameter contains Observer's summary information
 	
 	conclusion := e.analyzeExecution(task)
 	
-	// 如果需要更新安全策略，执行更新
+	// Update security policy if needed
 	if conclusion.NeedsUpdate {
 		e.updateSecurityPolicy(conclusion)
 	}
 	
-	// 如果需要调整Agent特性，执行调整
+	// Adjust agent traits if needed
 	if len(conclusion.AgentAdjustments) > 0 {
 		for _, adjustment := range conclusion.AgentAdjustments {
 			e.adjustAgentTraits(adjustment)
 		}
 	}
 	
-	// 返回分析结论
+	// Return analysis conclusion
 	return e.formatConclusion(conclusion), nil
 }
 
-// analyzeExecution 分析执行信息（使用LLM）
+// analyzeExecution analyzes execution information (using LLM)
 func (e *EvaluatorAgent) analyzeExecution(summary string) EvaluationConclusion {
-	// 构建分析提示
-	prompt := fmt.Sprintf(`你是一个管理分析Agent（Evaluator），负责分析Executor执行信息并得出结论。
+	prompt := fmt.Sprintf(`You are a management analysis Agent (Evaluator). Analyze the Executor execution summary and produce a structured conclusion.
 
-执行信息汇总:
+Execution Summary:
 %s
 
-请分析:
-1. Executor是正常退出还是异常退出？
-2. 是否检测到恶意指令？
-3. 任务是否完成？
-4. 是否需要更新安全策略（输入过滤、技能更新）？
-5. 是否需要调整Agent特性？
+Determine:
+1. Did the Executor exit normally or abnormally?
+2. Was any malicious instruction detected?
+3. Was the task completed?
+4. Is security policy update needed (input filter, skill update, agent adjustment)?
+5. Are agent trait adjustments needed?
 
-请以JSON格式返回分析结论:
+Respond with ONLY a JSON object wrapped in a single code block. No prose, no markdown headings.
+
+`+"```json"+`
 {
-  "exit_type": "normal/abnormal/malicious/deadloop",
-  "needs_update": true/false,
-  "update_type": "input_filter/skill_update/agent_adjustment",
-  "update_content": "更新内容描述",
-  "task_completed": true/false,
-  "retry_needed": true/false,
-  "retry_guidance": "重试指引",
+  "exit_type": "normal",
+  "needs_update": false,
+  "update_type": "input_filter",
+  "update_content": "description of the update",
+  "task_completed": true,
+  "retry_needed": false,
+  "retry_guidance": "guidance for retry, empty when not needed",
   "agent_adjustments": [
     {
-      "agent_name": "Agent名称",
+      "agent_name": "AgentName",
       "efficiency_delta": 0.01,
       "quality_delta": 0.02,
       "creativity_delta": 0.0
     }
   ]
-}`, summary)
-	
-	// 调用LLM进行分析
+}
+`+"```", summary)
+
 	response, err := e.llmClient.Chat(prompt)
 	if err != nil {
-		// LLM调用失败，使用硬编码规则作为后备
 		return e.fallbackAnalysis(summary)
 	}
-	
-	// 解析LLM返回的JSON
-	conclusion := e.parseConclusion(response)
+	conclusion, err := parseEvaluationConclusion(response)
+	if err != nil {
+		fmt.Printf("[Evaluator] JSON parse failed (%v); using fallback\n", err)
+		return e.fallbackAnalysis(summary)
+	}
 	return conclusion
 }
 
-// fallbackAnalysis 后备分析（硬编码规则）
+// fallbackAnalysis fallback analysis (hardcoded rules)
 func (e *EvaluatorAgent) fallbackAnalysis(summary string) EvaluationConclusion {
 	conclusion := EvaluationConclusion{
 		ExitType:      "normal",
 		TaskCompleted: true,
 	}
 	
-	// 简单的硬编码规则
+	// Simple hardcoded rules
 	lower := strings.ToLower(summary)
 	
-	// 异常退出检测
-	if strings.Contains(lower, "error") || strings.Contains(lower, "异常") {
+	// Abnormal exit detection
+	if strings.Contains(lower, "error") || strings.Contains(lower, "abnormal") {
 		conclusion.ExitType = "abnormal"
 		conclusion.TaskCompleted = false
 		conclusion.RetryNeeded = true
-		conclusion.RetryGuidance = "检查错误原因后重试"
+		conclusion.RetryGuidance = "Check error cause and retry"
 	}
 	
-	// 恶意指令检测
-	if strings.Contains(lower, "malicious") || strings.Contains(lower, "恶意") {
+	// Malicious instruction detection
+	if strings.Contains(lower, "malicious") {
 		conclusion.ExitType = "malicious"
 		conclusion.NeedsUpdate = true
 		conclusion.UpdateType = "input_filter"
-		conclusion.UpdateContent = "添加恶意指令过滤规则"
+		conclusion.UpdateContent = "Add malicious instruction filter rules"
 		conclusion.TaskCompleted = false
 	}
 	
-	// 死循环检测
-	if strings.Contains(lower, "deadloop") || strings.Contains(lower, "死循环") {
+	// Deadloop detection
+	if strings.Contains(lower, "deadloop") {
 		conclusion.ExitType = "deadloop"
 		conclusion.TaskCompleted = false
 		conclusion.RetryNeeded = true
-		conclusion.RetryGuidance = "调整参数避免死循环"
+		conclusion.RetryGuidance = "Adjust parameters to avoid deadloop"
 	}
 	
-	// 蜜罐检测
-	if strings.Contains(lower, "honeypot") || strings.Contains(lower, "蜜罐") {
+	// Honeypot detection
+	if strings.Contains(lower, "honeypot") {
 		conclusion.ExitType = "abnormal"
 		conclusion.NeedsUpdate = true
 		conclusion.UpdateType = "skill_update"
-		conclusion.UpdateContent = "更新安全测试技能，添加蜜罐识别模式"
+		conclusion.UpdateContent = "Update security testing skills, add honeypot detection patterns"
 		conclusion.TaskCompleted = false
 	}
 	
 	return conclusion
 }
 
-// parseConclusion 解析LLM返回的结论JSON
+// parseConclusion parses conclusion JSON returned by LLM (now via shared helper)
 func (e *EvaluatorAgent) parseConclusion(response string) EvaluationConclusion {
-	conclusion := EvaluationConclusion{}
-	
-	lower := strings.ToLower(response)
-	
-	// 解析退出类型
-	if strings.Contains(lower, `"exit_type": "abnormal"`) {
-		conclusion.ExitType = "abnormal"
-	} else if strings.Contains(lower, `"exit_type": "malicious"`) {
-		conclusion.ExitType = "malicious"
-	} else if strings.Contains(lower, `"exit_type": "deadloop"`) {
-		conclusion.ExitType = "deadloop"
-	} else {
-		conclusion.ExitType = "normal"
+	conclusion, err := parseEvaluationConclusion(response)
+	if err != nil {
+		return e.fallbackAnalysis(response)
 	}
-	
-	// 解析是否需要更新
-	if strings.Contains(lower, `"needs_update": true`) {
-		conclusion.NeedsUpdate = true
-	}
-	
-	// 解析任务是否完成
-	if strings.Contains(lower, `"task_completed": false`) {
-		conclusion.TaskCompleted = false
-	} else {
-		conclusion.TaskCompleted = true
-	}
-	
-	// 解析是否需要重试
-	if strings.Contains(lower, `"retry_needed": true`) {
-		conclusion.RetryNeeded = true
-	}
-	
-	// 解析Agent调整（简化处理）
-	if strings.Contains(lower, `"agent_adjustments"`) {
-		// 提取Agent名称（简化）
-		conclusion.AgentAdjustments = []*AgentTraitsAdjustment{
-			{
-				AgentName:       "DefaultAgent",
-				EfficiencyDelta: 0.01,
-				QualityDelta:    0.02,
-				CreativityDelta: 0,
-			},
-		}
-	}
-	
 	return conclusion
 }
 
-// updateSecurityPolicy 更新安全策略
+// updateSecurityPolicy updates security policy and persists to store
 func (e *EvaluatorAgent) updateSecurityPolicy(conclusion EvaluationConclusion) {
-	fmt.Printf("🔒 [Evaluator] 更新安全策略: %s\n", conclusion.UpdateType)
-	
+	fmt.Printf("[Evaluator] Updating security policy: %s\n", conclusion.UpdateType)
+
+	if e.store == nil {
+		fmt.Printf("[Evaluator] Warning: no store available, skipping persistence\n")
+		return
+	}
+
 	switch conclusion.UpdateType {
 	case "input_filter":
-		// 更新输入过滤规则（写入安全配置文件）
-		fmt.Printf("   - 添加输入过滤规则: %s\n", conclusion.UpdateContent)
-		// TODO: 实现具体的输入过滤更新逻辑
-		
+		existing, _ := e.store.GetSecurityPolicy("input_filter")
+		if existing != nil {
+			err := e.store.UpdateSecurityPolicy("input_filter", existing.PolicyContent+"\n"+conclusion.UpdateContent, true)
+			if err != nil {
+				fmt.Printf("[Evaluator] Failed to update input_filter: %v\n", err)
+			}
+		} else {
+			err := e.store.SaveSecurityPolicy("input_filter", conclusion.UpdateContent, true)
+			if err != nil {
+				fmt.Printf("[Evaluator] Failed to save input_filter: %v\n", err)
+			}
+		}
+
 	case "skill_update":
-		// 更新安全测试技能
-		fmt.Printf("   - 更新安全技能: %s\n", conclusion.UpdateContent)
-		// TODO: 实现具体的技能更新逻辑
-		
+		existing, _ := e.store.GetSecurityPolicy("skill_update")
+		if existing != nil {
+			err := e.store.UpdateSecurityPolicy("skill_update", existing.PolicyContent+"\n"+conclusion.UpdateContent, true)
+			if err != nil {
+				fmt.Printf("[Evaluator] Failed to update skill_update: %v\n", err)
+			}
+		} else {
+			err := e.store.SaveSecurityPolicy("skill_update", conclusion.UpdateContent, true)
+			if err != nil {
+				fmt.Printf("[Evaluator] Failed to save skill_update: %v\n", err)
+			}
+		}
+
 	case "agent_adjustment":
-		// Agent特性调整（在adjustAgentTraits中处理）
-		fmt.Printf("   - Agent特性调整\n")
+		fmt.Printf("   - Agent traits adjustment (handled in adjustAgentTraits)\n")
 	}
 }
 
-// adjustAgentTraits 调整Agent特性
+// adjustAgentTraits adjusts agent traits and persists to store
 func (e *EvaluatorAgent) adjustAgentTraits(adjustment *AgentTraitsAdjustment) {
-	fmt.Printf("📈 [Evaluator] 调整Agent特性: %s\n", adjustment.AgentName)
-	fmt.Printf("   - 效率调整: %.2f\n", adjustment.EfficiencyDelta)
-	fmt.Printf("   - 质量调整: %.2f\n", adjustment.QualityDelta)
-	fmt.Printf("   - 创造性调整: %.2f\n", adjustment.CreativityDelta)
-	
-	// 如果有SkillLoader，保存更新
-	if e.skillLoader != nil {
-		// TODO: 从SkillLoader加载当前特性，然后更新并保存
-		fmt.Printf("💾 [Evaluator] 保存更新到SKILL.md\n")
+	fmt.Printf("[Evaluator] Adjusting agent traits: %s\n", adjustment.AgentName)
+	fmt.Printf("   - Efficiency delta: %.2f\n", adjustment.EfficiencyDelta)
+	fmt.Printf("   - Quality delta: %.2f\n", adjustment.QualityDelta)
+	fmt.Printf("   - Creativity delta: %.2f\n", adjustment.CreativityDelta)
+
+	if e.store == nil {
+		fmt.Printf("[Evaluator] Warning: no store available, skipping persistence\n")
+		return
+	}
+
+	existing, err := e.store.GetAgentTraits(adjustment.AgentName)
+	if err != nil {
+		fmt.Printf("[Evaluator] Failed to get agent traits: %v\n", err)
+		return
+	}
+
+	existing.Efficiency = clamp(existing.Efficiency+adjustment.EfficiencyDelta, 0.0, 1.0)
+	existing.Quality = clamp(existing.Quality+adjustment.QualityDelta, 0.0, 1.0)
+	existing.Creativity = clamp(existing.Creativity+adjustment.CreativityDelta, 0.0, 1.0)
+
+	err = e.store.SaveAgentTraits(existing)
+	if err != nil {
+		fmt.Printf("[Evaluator] Failed to save agent traits: %v\n", err)
+	} else {
+		fmt.Printf("[Evaluator] Saved traits for %s: E=%.2f Q=%.2f C=%.2f\n",
+			adjustment.AgentName, existing.Efficiency, existing.Quality, existing.Creativity)
 	}
 }
 
-// formatConclusion 格式化结论输出
+// formatConclusion formats conclusion output
 func (e *EvaluatorAgent) formatConclusion(conclusion EvaluationConclusion) string {
 	var result strings.Builder
 	
-	result.WriteString("=== Evaluator分析结论 ===\n")
-	result.WriteString(fmt.Sprintf("退出类型: %s\n", conclusion.ExitType))
+	result.WriteString("=== Evaluator Analysis Conclusion ===\n")
+	result.WriteString(fmt.Sprintf("Exit Type: %s\n", conclusion.ExitType))
 	
 	if conclusion.TaskCompleted {
-		result.WriteString("任务完成: 是\n")
+		result.WriteString("Task Completed: Yes\n")
 	} else {
-		result.WriteString("任务完成: 否\n")
+		result.WriteString("Task Completed: No\n")
 	}
 	
 	if conclusion.NeedsUpdate {
-		result.WriteString(fmt.Sprintf("\n需要更新安全策略:\n"))
-		result.WriteString(fmt.Sprintf("  类型: %s\n", conclusion.UpdateType))
-		result.WriteString(fmt.Sprintf("  内容: %s\n", conclusion.UpdateContent))
+		result.WriteString(fmt.Sprintf("\nSecurity Policy Update Required:\n"))
+		result.WriteString(fmt.Sprintf("  Type: %s\n", conclusion.UpdateType))
+		result.WriteString(fmt.Sprintf("  Content: %s\n", conclusion.UpdateContent))
 	}
 	
 	if conclusion.RetryNeeded {
-		result.WriteString(fmt.Sprintf("\n需要重试:\n"))
-		result.WriteString(fmt.Sprintf("  指引: %s\n", conclusion.RetryGuidance))
+		result.WriteString(fmt.Sprintf("\nRetry Required:\n"))
+		result.WriteString(fmt.Sprintf("  Guidance: %s\n", conclusion.RetryGuidance))
 	}
 	
 	if len(conclusion.AgentAdjustments) > 0 {
-		result.WriteString(fmt.Sprintf("\nAgent特性调整建议:\n"))
+		result.WriteString(fmt.Sprintf("\nAgent Traits Adjustments:\n"))
 		for _, adj := range conclusion.AgentAdjustments {
-			result.WriteString(fmt.Sprintf("  %s: 效率+%.2f, 质量+%.2f\n", 
+			result.WriteString(fmt.Sprintf("  %s: Efficiency+%.2f, Quality+%.2f\n", 
 				adj.AgentName, adj.EfficiencyDelta, adj.QualityDelta))
 		}
 	}
