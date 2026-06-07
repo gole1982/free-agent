@@ -11,29 +11,35 @@ import (
 	"github.com/vibe-coding/free-agent/internal/messaging"
 )
 
-type CoderAgent struct {
+// CodeGenerator - 代码生成Agent
+// 负责根据需求生成高质量代码并保存到文件
+type CodeGenerator struct {
 	gateway   *llm.SimpleGateway
 	workDir   string
 	fileIndex int
 }
 
-func NewCoderAgent(gateway *llm.SimpleGateway, workDir string) *CoderAgent {
-	return &CoderAgent{
+// NewCodeGenerator 创建CodeGenerator Agent
+func NewCodeGenerator(gateway *llm.SimpleGateway, workDir string) *CodeGenerator {
+	return &CodeGenerator{
 		gateway:   gateway,
 		workDir:   workDir,
 		fileIndex: 1,
 	}
 }
 
-func (a *CoderAgent) Name() string {
-	return "Coder"
+// Name 实现Agent接口
+func (a *CodeGenerator) Name() string {
+	return "CodeGenerator"
 }
 
-func (a *CoderAgent) Description() string {
-	return "Code generation and implementation. Writes clean, efficient code in various programming languages and saves to files."
+// Description 实现Agent接口
+func (a *CodeGenerator) Description() string {
+	return "Code Generator - Generates clean, efficient code in various programming languages and saves to files"
 }
 
-func (a *CoderAgent) Execute(ctx context.Context, input string) (string, error) {
+// Execute 执行代码生成
+func (a *CodeGenerator) Execute(ctx context.Context, input string) (string, error) {
 	// 构建提示词
 	codeBlockStart := "```"
 	codeBlockEnd := "```"
@@ -83,7 +89,7 @@ func (a *CoderAgent) Execute(ctx context.Context, input string) (string, error) 
 	return result, nil
 }
 
-func (a *CoderAgent) saveCodeBlocks(content string) ([]string, error) {
+func (a *CodeGenerator) saveCodeBlocks(content string) ([]string, error) {
 	var savedFiles []string
 
 	processor := messaging.NewMessageProcessor()
@@ -108,7 +114,7 @@ func (a *CoderAgent) saveCodeBlocks(content string) ([]string, error) {
 	return savedFiles, nil
 }
 
-func (a *CoderAgent) generateFileName(ext string) string {
+func (a *CodeGenerator) generateFileName(ext string) string {
 	nameMap := map[string]string{
 		"html":      "index.html",
 		"css":       "style.css",
