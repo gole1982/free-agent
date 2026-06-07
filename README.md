@@ -12,6 +12,60 @@ A harness-style multi-AI agent system for software engineering.
 - 🔄 Multi-turn conversation support
 - 📊 Real-time system status monitoring
 - 🔒 Separate program and project configurations
+- 🔄 **Worker/Watcher/Auditor Architecture** - Clear separation between hardcoded scheduling and agent intelligence
+- 📝 **Skill-Driven Configuration** - Agent behaviors defined in SKILL.md files
+- ⚙️ **Self-Learning System** - Agents optimize traits based on execution feedback
+
+## Architecture Overview
+
+Free Agent uses a clear boundary between hardcoded system functions and agent-driven intelligence:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Scheduler (Hardcoded)                           │
+│  System scheduling, timing, lifecycle management, channel management │
+└─────────────────────────────────────────────────────────────────────┘
+                                ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│                  Orchestrator (Agent)                               │
+│  Business-level task coordination, task decomposition               │
+└─────────────────────────────────────────────────────────────────────┘
+                                ↓
+        ┌────────────────────────┼────────────────────────┐
+        ↓                        ↓                        ↓
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│  Workers        │    │  Watcher        │    │  Auditor        │
+│  (Agents)       │    │  (Agent)        │    │  (Agent)        │
+│ - Intent        │    │ - Intent check  │    │ - Result review │
+│ - Planner       │    │ - Deadloop det  │    │ - Policy update │
+│ - Coder         │    │ - Honeypot det  │    │ - Trait adjust  │
+│ - Pentesting    │    │ - Malicious det │    │                 │
+│ - SQLi/XSS/...  │    │ - Stop & guide  │    │                 │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+### Hardcoded vs Agent Boundary
+
+| System Function | Implementation | Reason |
+|-----------------|----------------|--------|
+| Timing & Timeouts | **Hardcoded** | System infrastructure |
+| Scheduled Tasks | **Hardcoded** | Fixed logic |
+| Lifecycle Management | **Hardcoded** | Deterministic process |
+| Channel/Flow Management | **Hardcoded** | Infrastructure |
+| Intent Monitoring | **Agent** | Requires LLM judgment |
+| Deadloop Detection | **Agent** | Context understanding needed |
+| Honeypot Detection | **Agent** | Intelligent recognition |
+| Result Review | **Agent** | Quality assessment needed |
+| Policy Updates | **Agent** | Learning and adaptation |
+| Business Execution | **Agent** | Domain intelligence |
+
+### Skill Configuration
+
+Agent behaviors are defined in `SKILL.md` files under the `skills/` directory:
+- **Agent Character** - Role description
+- **Core Capabilities** - What the agent can do
+- **Workflow** - How the agent operates
+- **Quality Metrics** - Efficiency, Quality, Creativity, Collaboration scores
 
 ## Quick Start
 
@@ -109,14 +163,27 @@ Automatically generated in project directory when creating sessions:
 ```
 free-agent/
 ├── .env                      # Program configuration
+├── DESIGN.md                  # Complete system design and requirements
+├── README.md                # This file
 ├── .github/workflows/ci-cd.yml  # CI/CD pipeline
 ├── cmd/free-agent/main.go     # Main entry point
 ├── internal/
 │   ├── agent/                # AI agents
+│   │   ├── scheduler.go       # Scheduler (hardcoded)
+│   │   ├── watcher_agent.go # Watcher (control agent)
+│   │   ├── auditor_agent.go # Auditor (management agent)
+│   │   ├── skill_loader.go  # SKILL.md parser
+│   │   └── ...            # Other worker agents
 │   ├── llm/                  # LLM client
 │   ├── logger/               # Logging system
 │   ├── memory/               # Conversation storage
 │   └── ui/                   # Terminal UI
+├── skills/                   # Agent skill configurations
+│   ├── coding/             # Coding agents
+│   ├── control/            # Control agents
+│   ├── management/         # Management agents
+│   ├── security/            # Security testing agents
+│   └── ...
 ├── pkg/config/               # Configuration management
 └── projects/                 # Project sessions directory
 ```
