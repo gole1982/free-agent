@@ -10,20 +10,20 @@ import (
 	"github.com/vibe-coding/free-agent/internal/llm"
 )
 
-// WorkerExecutionInfo Worker执行过程中生成的关键信息
-type WorkerExecutionInfo struct {
-	AgentName      string
-	Task           string
-	Output         string
-	ExecutionFlag  string // normal/warning/error/honeypot/deadloop
-	Timestamp      time.Time
-	IntentMatch    float64 // 与用户意图的匹配度
+// ExecutorExecutionInfo Executor执行过程中生成的关键信息
+type ExecutorExecutionInfo struct {
+	AgentName           string
+	Task                string
+	Output              string
+	ExecutionFlag       string // normal/warning/error/honeypot/deadloop
+	Timestamp           time.Time
+	IntentMatch         float64 // 与用户意图的匹配度
 	SuspiciousIndicators []string // 可疑指标
 }
 
-// WatcherDecision Watcher的判断结果
-type WatcherDecision struct {
-	ShouldStop       bool     // 是否应该停止Worker
+// ObserverDecision Observer的判断结果
+type ObserverDecision struct {
+	ShouldStop       bool     // 是否应该停止Executor
 	Reason           string   // 原因
 	CorrectGuidance  string   // 正确指引（如果需要）
 	IntentAlignment  float64  // 与用户意图的匹配度
@@ -32,118 +32,119 @@ type WatcherDecision struct {
 	IsHoneypot       bool     // 是否检测到蜜罐
 }
 
-// WatcherAgent 控制Agent - 监控Worker执行，判断是否遵循用户意图
-type WatcherAgent struct {
-	name           string
-	llmClient      *llm.Client
-	workerInfoChan chan WorkerExecutionInfo
-	decisionChan   chan WatcherDecision
-	stopChan       chan struct{}
-	mu             sync.Mutex
-	workerInfos    []WorkerExecutionInfo
-	originalIntent string // 用户原始意图
+// ObserverAgent 控制Agent - 监控Executor执行，判断是否遵循用户意图
+// 使用 Observer 模式术语，符合软件工程标准命名
+type ObserverAgent struct {
+	name              string
+	llmClient         *llm.Client
+	executorInfoChan  chan ExecutorExecutionInfo
+	decisionChan      chan ObserverDecision
+	stopChan          chan struct{}
+	mu                sync.Mutex
+	executorInfos     []ExecutorExecutionInfo
+	originalIntent    string // 用户原始意图
 }
 
-// NewWatcherAgent 创建Watcher Agent
-func NewWatcherAgent(llmClient *llm.Client) *WatcherAgent {
-	return &WatcherAgent{
-		name:           "Watcher",
-		llmClient:      llmClient,
-		workerInfoChan: make(chan WorkerExecutionInfo, 100),
-		decisionChan:   make(chan WatcherDecision, 10),
-		stopChan:       make(chan struct{}),
-		workerInfos:    make([]WorkerExecutionInfo, 0),
+// NewObserverAgent 创建Observer Agent
+func NewObserverAgent(llmClient *llm.Client) *ObserverAgent {
+	return &ObserverAgent{
+		name:              "Observer",
+		llmClient:         llmClient,
+		executorInfoChan:  make(chan ExecutorExecutionInfo, 100),
+		decisionChan:      make(chan ObserverDecision, 10),
+		stopChan:          make(chan struct{}),
+		executorInfos:     make([]ExecutorExecutionInfo, 0),
 	}
 }
 
 // Name 实现Agent接口
-func (w *WatcherAgent) Name() string {
-	return w.name
+func (o *ObserverAgent) Name() string {
+	return o.name
 }
 
 // Description 实现Agent接口
-func (w *WatcherAgent) Description() string {
-	return "控制Agent - 监控Worker执行，判断是否遵循用户意图"
+func (o *ObserverAgent) Description() string {
+	return "控制Agent - 监控Executor执行，判断是否遵循用户意图（Observer模式）"
 }
 
-// SetOriginalIntent 设置用户原始意图（用于判断Worker是否遵循）
-func (w *WatcherAgent) SetOriginalIntent(intent string) {
-	w.mu.Lock()
-	w.originalIntent = intent
-	w.mu.Unlock()
+// SetOriginalIntent 设置用户原始意图（用于判断Executor是否遵循）
+func (o *ObserverAgent) SetOriginalIntent(intent string) {
+	o.mu.Lock()
+	o.originalIntent = intent
+	o.mu.Unlock()
 }
 
-// ReceiveWorkerInfo 接收Worker执行信息（调度者调用）
-func (w *WatcherAgent) ReceiveWorkerInfo(info WorkerExecutionInfo) {
-	w.workerInfoChan <- info
+// ReceiveExecutorInfo 接收Executor执行信息（调度者调用）
+func (o *ObserverAgent) ReceiveExecutorInfo(info ExecutorExecutionInfo) {
+	o.executorInfoChan <- info
 }
 
-// GetDecision 获取Watcher的判断结果（调度者调用）
-func (w *WatcherAgent) GetDecision() WatcherDecision {
+// GetDecision 获取Observer的判断结果（调度者调用）
+func (o *ObserverAgent) GetDecision() ObserverDecision {
 	select {
-	case decision := <-w.decisionChan:
+	case decision := <-o.decisionChan:
 		return decision
 	default:
-		return WatcherDecision{ShouldStop: false}
+		return ObserverDecision{ShouldStop: false}
 	}
 }
 
-// StopWorker 停止监控并汇总信息（调度者调用）
-func (w *WatcherAgent) StopWorker() {
-	w.stopChan <- struct{}{}
+// StopExecutor 停止监控并汇总信息（调度者调用）
+func (o *ObserverAgent) StopExecutor() {
+	o.stopChan <- struct{}{}
 }
 
 // GetSummary 获取执行信息汇总（调度者调用）
-func (w *WatcherAgent) GetSummary() []WorkerExecutionInfo {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.workerInfos
+func (o *ObserverAgent) GetSummary() []ExecutorExecutionInfo {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.executorInfos
 }
 
-// Execute Watcher的主执行逻辑（Agent接口）
-func (w *WatcherAgent) Execute(ctx context.Context, task string) (string, error) {
-	// Watcher的执行是持续监控过程
-	// 它会持续接收Worker信息，并做出判断
+// Execute Observer的主执行逻辑（Agent接口）
+func (o *ObserverAgent) Execute(ctx context.Context, task string) (string, error) {
+	// Observer的执行是持续监控过程
+	// 它会持续接收Executor信息，并做出判断
 	
 	for {
 		select {
 		case <-ctx.Done():
-			return "Watcher被取消", ctx.Err()
+			return "Observer被取消", ctx.Err()
 			
-		case <-w.stopChan:
-			// Worker退出，汇总信息
-			return w.generateSummary(), nil
+		case <-o.stopChan:
+			// Executor退出，汇总信息
+			return o.generateSummary(), nil
 			
-		case info := <-w.workerInfoChan:
-			// 接收到Worker信息，进行判断
-			w.mu.Lock()
-			w.workerInfos = append(w.workerInfos, info)
-			w.mu.Unlock()
+		case info := <-o.executorInfoChan:
+			// 接收到Executor信息，进行判断
+			o.mu.Lock()
+			o.executorInfos = append(o.executorInfos, info)
+			o.mu.Unlock()
 			
 			// 使用LLM判断是否遵循用户意图
-			decision := w.analyzeWorkerInfo(ctx, info)
+			decision := o.analyzeExecutorInfo(ctx, info)
 			
 			if decision.ShouldStop {
 				// 发送停止决策
-				w.decisionChan <- decision
+				o.decisionChan <- decision
 				return fmt.Sprintf("检测到异常: %s\n指引: %s", decision.Reason, decision.CorrectGuidance), nil
 			}
 		}
 	}
 }
 
-// analyzeWorkerInfo 分析Worker执行信息（使用LLM判断）
-func (w *WatcherAgent) analyzeWorkerInfo(ctx context.Context, info WorkerExecutionInfo) WatcherDecision {
-	w.mu.Lock()
-	intent := w.originalIntent
-	w.mu.Unlock()
+// analyzeExecutorInfo 分析Executor执行信息（使用LLM判断）
+func (o *ObserverAgent) analyzeExecutorInfo(ctx context.Context, info ExecutorExecutionInfo) ObserverDecision {
+	o.mu.Lock()
+	intent := o.originalIntent
+	o.mu.Unlock()
 	
 	// 构建判断提示
-	prompt := fmt.Sprintf(`你是一个执行监控Agent（Watcher），负责判断Worker是否遵循用户意图。
+	prompt := fmt.Sprintf(`你是一个执行监控Agent（Observer），负责判断Executor是否遵循用户意图。
 
 用户原始意图: %s
 
-Worker执行信息:
+Executor执行信息:
 - Agent名称: %s
 - 任务: %s
 - 输出摘要: %s
@@ -151,7 +152,7 @@ Worker执行信息:
 - 可疑指标: %v
 
 请判断:
-1. Worker是否遵循用户原始意图？
+1. Executor是否遵循用户原始意图？
 2. 是否有死循环迹象（重复输出、无进展）？
 3. 是否有恶意行为（尝试执行危险操作）？
 4. 是否触发蜜罐（响应中包含"被抓"、"caught"等）？
@@ -178,20 +179,20 @@ Worker执行信息:
 		info.SuspiciousIndicators)
 	
 	// 调用LLM进行判断
-	response, err := w.llmClient.Chat(prompt)
+	response, err := o.llmClient.Chat(prompt)
 	if err != nil {
 		// LLM调用失败，使用硬编码规则作为后备
-		return w.fallbackAnalysis(info)
+		return o.fallbackAnalysis(info)
 	}
 	
 	// 解析LLM返回的JSON
-	decision := w.parseDecision(response)
+	decision := o.parseDecision(response)
 	return decision
 }
 
 // fallbackAnalysis 后备分析（硬编码规则，用于LLM失败时）
-func (w *WatcherAgent) fallbackAnalysis(info WorkerExecutionInfo) WatcherDecision {
-	decision := WatcherDecision{
+func (o *ObserverAgent) fallbackAnalysis(info ExecutorExecutionInfo) ObserverDecision {
+	decision := ObserverDecision{
 		ShouldStop:      false,
 		IntentAlignment: 0.8,
 	}
@@ -208,9 +209,9 @@ func (w *WatcherAgent) fallbackAnalysis(info WorkerExecutionInfo) WatcherDecisio
 	}
 	
 	// 死循环检测（检查历史输出）
-	w.mu.Lock()
-	infos := w.workerInfos
-	w.mu.Unlock()
+	o.mu.Lock()
+	infos := o.executorInfos
+	o.mu.Unlock()
 	
 	if len(infos) >= 3 {
 		last := infos[len(infos)-1].Output
@@ -227,9 +228,9 @@ func (w *WatcherAgent) fallbackAnalysis(info WorkerExecutionInfo) WatcherDecisio
 }
 
 // parseDecision 解析LLM返回的决策JSON
-func (w *WatcherAgent) parseDecision(response string) WatcherDecision {
+func (o *ObserverAgent) parseDecision(response string) ObserverDecision {
 	// 简化解析，提取关键信息
-	decision := WatcherDecision{}
+	decision := ObserverDecision{}
 	
 	lower := strings.ToLower(response)
 	
@@ -264,14 +265,14 @@ func (w *WatcherAgent) parseDecision(response string) WatcherDecision {
 }
 
 // generateSummary 生成执行信息汇总
-func (w *WatcherAgent) generateSummary() string {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+func (o *ObserverAgent) generateSummary() string {
+	o.mu.Lock()
+	defer o.mu.Unlock()
 	
 	var summary strings.Builder
-	summary.WriteString("=== Worker执行信息汇总 ===\n")
+	summary.WriteString("=== Executor执行信息汇总 ===\n")
 	
-	for i, info := range w.workerInfos {
+	for i, info := range o.executorInfos {
 		summary.WriteString(fmt.Sprintf("\n[%d] Agent: %s\n", i+1, info.AgentName))
 		summary.WriteString(fmt.Sprintf("    任务: %s\n", truncate(info.Task, 100)))
 		summary.WriteString(fmt.Sprintf("    标记: %s\n", info.ExecutionFlag))

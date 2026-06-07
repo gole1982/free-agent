@@ -8,8 +8,8 @@ import (
 	"github.com/vibe-coding/free-agent/internal/llm"
 )
 
-// AuditConclusion Auditor的分析结论
-type AuditConclusion struct {
+// EvaluationConclusion Evaluator的分析结论
+type EvaluationConclusion struct {
 	ExitType          string   // normal/abnormal/malicious/deadloop
 	NeedsUpdate       bool     // 是否需要更新安全策略
 	UpdateType        string   // input_filter/skill_update/agent_adjustment
@@ -20,65 +20,66 @@ type AuditConclusion struct {
 	AgentAdjustments  []*AgentTraitsAdjustment // Agent特性调整建议
 }
 
-// AuditorAgent 管理Agent - 分析执行信息，得出结论并更新安全策略
-type AuditorAgent struct {
+// EvaluatorAgent 管理Agent - 分析执行信息，得出结论并更新安全策略
+// 使用 Evaluator 术语，符合评估系统标准命名
+type EvaluatorAgent struct {
 	name        string
 	llmClient   *llm.Client
 	skillLoader *SkillLoader
 }
 
-// NewAuditorAgent 创建Auditor Agent
-func NewAuditorAgent(llmClient *llm.Client, skillLoader *SkillLoader) *AuditorAgent {
-	return &AuditorAgent{
-		name:        "Auditor",
+// NewEvaluatorAgent 创建Evaluator Agent
+func NewEvaluatorAgent(llmClient *llm.Client, skillLoader *SkillLoader) *EvaluatorAgent {
+	return &EvaluatorAgent{
+		name:        "Evaluator",
 		llmClient:   llmClient,
 		skillLoader: skillLoader,
 	}
 }
 
 // Name 实现Agent接口
-func (a *AuditorAgent) Name() string {
-	return a.name
+func (e *EvaluatorAgent) Name() string {
+	return e.name
 }
 
 // Description 实现Agent接口
-func (a *AuditorAgent) Description() string {
-	return "管理Agent - 分析执行信息，得出结论并更新安全策略"
+func (e *EvaluatorAgent) Description() string {
+	return "管理Agent - 分析执行信息，得出结论并更新安全策略（Evaluator模式）"
 }
 
-// Execute Auditor的主执行逻辑（Agent接口）
-func (a *AuditorAgent) Execute(ctx context.Context, task string) (string, error) {
-	// Auditor接收Watcher的汇总信息进行分析
-	// task参数包含Watcher的汇总信息
+// Execute Evaluator的主执行逻辑（Agent接口）
+func (e *EvaluatorAgent) Execute(ctx context.Context, task string) (string, error) {
+	// Evaluator接收Observer的汇总信息进行分析
+	// task参数包含Observer的汇总信息
 	
-	conclusion := a.analyzeExecution(task)
+	conclusion := e.analyzeExecution(task)
 	
 	// 如果需要更新安全策略，执行更新
 	if conclusion.NeedsUpdate {
-		a.updateSecurityPolicy(conclusion)
+		e.updateSecurityPolicy(conclusion)
 	}
 	
 	// 如果需要调整Agent特性，执行调整
 	if len(conclusion.AgentAdjustments) > 0 {
 		for _, adjustment := range conclusion.AgentAdjustments {
-			a.adjustAgentTraits(adjustment)
+			e.adjustAgentTraits(adjustment)
 		}
 	}
 	
 	// 返回分析结论
-	return a.formatConclusion(conclusion), nil
+	return e.formatConclusion(conclusion), nil
 }
 
 // analyzeExecution 分析执行信息（使用LLM）
-func (a *AuditorAgent) analyzeExecution(summary string) AuditConclusion {
+func (e *EvaluatorAgent) analyzeExecution(summary string) EvaluationConclusion {
 	// 构建分析提示
-	prompt := fmt.Sprintf(`你是一个管理分析Agent（Auditor），负责分析Worker执行信息并得出结论。
+	prompt := fmt.Sprintf(`你是一个管理分析Agent（Evaluator），负责分析Executor执行信息并得出结论。
 
 执行信息汇总:
 %s
 
 请分析:
-1. Worker是正常退出还是异常退出？
+1. Executor是正常退出还是异常退出？
 2. 是否检测到恶意指令？
 3. 任务是否完成？
 4. 是否需要更新安全策略（输入过滤、技能更新）？
@@ -104,20 +105,20 @@ func (a *AuditorAgent) analyzeExecution(summary string) AuditConclusion {
 }`, summary)
 	
 	// 调用LLM进行分析
-	response, err := a.llmClient.Chat(prompt)
+	response, err := e.llmClient.Chat(prompt)
 	if err != nil {
 		// LLM调用失败，使用硬编码规则作为后备
-		return a.fallbackAnalysis(summary)
+		return e.fallbackAnalysis(summary)
 	}
 	
 	// 解析LLM返回的JSON
-	conclusion := a.parseConclusion(response)
+	conclusion := e.parseConclusion(response)
 	return conclusion
 }
 
 // fallbackAnalysis 后备分析（硬编码规则）
-func (a *AuditorAgent) fallbackAnalysis(summary string) AuditConclusion {
-	conclusion := AuditConclusion{
+func (e *EvaluatorAgent) fallbackAnalysis(summary string) EvaluationConclusion {
+	conclusion := EvaluationConclusion{
 		ExitType:      "normal",
 		TaskCompleted: true,
 	}
@@ -163,8 +164,8 @@ func (a *AuditorAgent) fallbackAnalysis(summary string) AuditConclusion {
 }
 
 // parseConclusion 解析LLM返回的结论JSON
-func (a *AuditorAgent) parseConclusion(response string) AuditConclusion {
-	conclusion := AuditConclusion{}
+func (e *EvaluatorAgent) parseConclusion(response string) EvaluationConclusion {
+	conclusion := EvaluationConclusion{}
 	
 	lower := strings.ToLower(response)
 	
@@ -213,8 +214,8 @@ func (a *AuditorAgent) parseConclusion(response string) AuditConclusion {
 }
 
 // updateSecurityPolicy 更新安全策略
-func (a *AuditorAgent) updateSecurityPolicy(conclusion AuditConclusion) {
-	fmt.Printf("🔒 [Auditor] 更新安全策略: %s\n", conclusion.UpdateType)
+func (e *EvaluatorAgent) updateSecurityPolicy(conclusion EvaluationConclusion) {
+	fmt.Printf("🔒 [Evaluator] 更新安全策略: %s\n", conclusion.UpdateType)
 	
 	switch conclusion.UpdateType {
 	case "input_filter":
@@ -234,24 +235,24 @@ func (a *AuditorAgent) updateSecurityPolicy(conclusion AuditConclusion) {
 }
 
 // adjustAgentTraits 调整Agent特性
-func (a *AuditorAgent) adjustAgentTraits(adjustment *AgentTraitsAdjustment) {
-	fmt.Printf("📈 [Auditor] 调整Agent特性: %s\n", adjustment.AgentName)
+func (e *EvaluatorAgent) adjustAgentTraits(adjustment *AgentTraitsAdjustment) {
+	fmt.Printf("📈 [Evaluator] 调整Agent特性: %s\n", adjustment.AgentName)
 	fmt.Printf("   - 效率调整: %.2f\n", adjustment.EfficiencyDelta)
 	fmt.Printf("   - 质量调整: %.2f\n", adjustment.QualityDelta)
 	fmt.Printf("   - 创造性调整: %.2f\n", adjustment.CreativityDelta)
 	
 	// 如果有SkillLoader，保存更新
-	if a.skillLoader != nil {
+	if e.skillLoader != nil {
 		// TODO: 从SkillLoader加载当前特性，然后更新并保存
-		fmt.Printf("💾 [Auditor] 保存更新到SKILL.md\n")
+		fmt.Printf("💾 [Evaluator] 保存更新到SKILL.md\n")
 	}
 }
 
 // formatConclusion 格式化结论输出
-func (a *AuditorAgent) formatConclusion(conclusion AuditConclusion) string {
+func (e *EvaluatorAgent) formatConclusion(conclusion EvaluationConclusion) string {
 	var result strings.Builder
 	
-	result.WriteString("=== Auditor分析结论 ===\n")
+	result.WriteString("=== Evaluator分析结论 ===\n")
 	result.WriteString(fmt.Sprintf("退出类型: %s\n", conclusion.ExitType))
 	
 	if conclusion.TaskCompleted {

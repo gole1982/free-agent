@@ -281,8 +281,8 @@ func runTask(input string) error {
 	// 设置调度器配置（可通过配置文件调整）
 	scheduler.SetMaxIterations(10)
 	scheduler.SetMaxDuration(10 * time.Minute)
-	scheduler.SetWorkerTimeout(5 * time.Minute)
-	scheduler.SetWatcherInterval(100 * time.Millisecond)
+	scheduler.SetExecutorTimeout(5 * time.Minute)
+	scheduler.SetObserverInterval(100 * time.Millisecond)
 
 	ctx := context.Background()
 	
