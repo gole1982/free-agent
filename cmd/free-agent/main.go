@@ -270,52 +270,24 @@ func runTask(input string) error {
 	am.RegisterAgent(orchestrator)
 
 	// =============================================
-	// 初始化三层闭环管理器 (用于迭代执行)
+	// 使用新的 Scheduler + Worker/Watcher/Auditor 模式
 	// =============================================
-	// 先创建 SkillLoader
+	// 创建 SkillLoader
 	skillLoader := agent.NewSkillLoader("skills")
 	
-	closedLoopMgr := agent.NewClosedLoopManager(llmClient, am, skillLoader)
+	// 创建调度器（硬编码系统调度）
+	scheduler := agent.NewScheduler(llmClient, am, skillLoader)
 	
-	// 从 SKILL.md 加载 Agent 特质
-	agentNames := []string{
-		"Intent", "Coder", "Planner", "Reviewer", "Tester", "Debugger", 
-		"Git", "Feedback", "Pentesting", "SQLiAgent", "XSSAgent",
-		"CommandInjectAgent", "PathTraversalAgent", "SSRFAgent",
-		"FileIncludeAgent", "CTFExploration", "Generic Agent", 
-		"Exploration", "Orchestrator",
-	}
-	
-	for _, name := range agentNames {
-		skill, err := skillLoader.LoadSkill(name)
-		if err == nil && skill.Metrics != nil {
-			// 确保 LearningRate 有默认值
-			if skill.Metrics.LearningRate == 0 {
-				skill.Metrics.LearningRate = 0.1
-			}
-			closedLoopMgr.RegisterAgentTraits(name, skill.Metrics)
-			fmt.Printf("Loaded skill for agent: %s\n", name)
-		} else {
-			// 如果找不到 SKILL.md，使用默认值
-			defaultTraits := &agent.AgentTraits{
-				Name:          name,
-				Efficiency:    0.7,
-				Quality:       0.7,
-				Creativity:    0.7,
-				Collaboration: 0.7,
-				LearningRate:  0.1,
-			}
-			closedLoopMgr.RegisterAgentTraits(name, defaultTraits)
-			fmt.Printf("Using default traits for agent: %s (err: %v)\n", name, err)
-		}
-	}
+	// 设置调度器配置（可通过配置文件调整）
+	scheduler.SetMaxIterations(10)
+	scheduler.SetMaxDuration(10 * time.Minute)
+	scheduler.SetWorkerTimeout(5 * time.Minute)
+	scheduler.SetWatcherInterval(100 * time.Millisecond)
 
 	ctx := context.Background()
 	
-	// =============================================
-	// 使用三层闭环系统执行
-	// =============================================
-	result, err := closedLoopMgr.ExecuteWithLoop(ctx, input)
+	// 使用新模式执行任务
+	result, err := scheduler.ExecuteWithAgentPattern(ctx, input)
 	
 	if err != nil {
 		return err
